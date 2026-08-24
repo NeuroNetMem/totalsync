@@ -55,25 +55,25 @@ const int nStates = 8;
 #define WHEEL_ENC_PINB 3
 #define WHEEL_ENC_SW 4
 #define BLICK 5
-#define Speaker 7
+#define SPEAKER 7
 #define LED_1 8
 #define PIN_CAMERA_FSTROBE 12
 #define LICK 17
 #define VALVE 24
 #define REWARD 25
 #define LICKDETECT 26
-#define Tone1 27
-#define Tone2 28
-#define trigger_aatc 29
+#define TONE1 27
+#define TONE2 28
+#define TRIGGER_AATC 29
 #define EXPER 30
 #define SHOCK 31
 #define PRESHOCK 32
 #define LED_2 33
 #define TESTSHOCK 35
-#define ephys_trigger 36
-#define ephys_sync 37
+#define EPHYS_TRIGGER 36
+#define EPHYS_SYNC 37
 #define PIN_SYNC_LED 38
-#define trigger_c 39
+#define TRIGGER_C 39
 
 // Pins used to scope the communication / acquisition timing
 #define LOOP_INDICATOR 40
@@ -404,7 +404,7 @@ void gather() {
   if (ephys == 1) {
     ephysrand();
   } else {
-    digitalWriteFast(ephys_sync, LOW);
+    digitalWriteFast(EPHYS_SYNC, LOW);
   }
 
   if (exper == 1) {
@@ -436,12 +436,12 @@ void gather() {
     packet.digitalIn |= digitalReadFast(pinsDigitalIn[i]) << i;
   }
 
-  camera_trigger = digitalReadFast(trigger_c);
+  camera_trigger = digitalReadFast(TRIGGER_C);
   reward = digitalReadFast(REWARD);
   // ephys = digitalReadFast(ephys_trigger);
   exper = digitalReadFast(EXPER);
   preshock = digitalReadFast(PRESHOCK);
-  AATC_trigger = digitalReadFast(trigger_aatc);
+  AATC_trigger = digitalReadFast(TRIGGER_AATC);
 
   // With the IR lick detector we don't need a moving average anymore
   lick = analogRead(LICK);
@@ -684,7 +684,7 @@ void syncBlink() {
 // Same counter pattern, mirrored on the ephys sync line
 void ephysrand() {
   if (ephys == 1) {
-    digitalWriteFast(ephys_sync, (syncCounter >> syncCounterIdx) & 0x1);
+    digitalWriteFast(EPHYS_SYNC, (syncCounter >> syncCounterIdx) & 0x1);
     updateSyncCounter = true;
   }
 }
@@ -803,10 +803,10 @@ void AATC() {
   }
   if ((current_millis == triggertime) && (Tone == 1) && (n_sound1 < 3)) {
     // Tone CS+
-    analogWriteFrequency(Speaker, 9000);
-    analogWrite(Speaker, 127);
+    analogWriteFrequency(SPEAKER, 9000);
+    analogWrite(SPEAKER, 127);
 
-    digitalWriteFast(Tone1, HIGH);
+    digitalWriteFast(TONE1, HIGH);
     rewardtime = triggertime + 3000;
     tonelength = triggertime + 2000;
     triggertime = triggertime + random(29000, 45000);
@@ -815,9 +815,9 @@ void AATC() {
     Tone = random(2);
   }
   if (current_millis == tonelength) {
-    digitalWriteFast(Tone1, LOW);
-    digitalWriteFast(Tone2, LOW);
-    analogWrite(Speaker, 0);
+    digitalWriteFast(TONE1, LOW);
+    digitalWriteFast(TONE2, LOW);
+    analogWrite(SPEAKER, 0);
   }
   if (current_millis == rewardtime) {
     digitalWriteFast(REWARD, HIGH);
@@ -828,9 +828,9 @@ void AATC() {
 
   if ((current_millis == triggertime) && (Tone == 0) && (n_sound2 < 3)) {
     // Tone CS-
-    tone(Speaker, 3000, 2000);
+    tone(SPEAKER, 3000, 2000);
 
-    digitalWriteFast(Tone2, HIGH);
+    digitalWriteFast(TONE2, HIGH);
     tonelength = triggertime + 2000;
     triggertime = triggertime + random(29000, 45000);
     Tone = random(2);
