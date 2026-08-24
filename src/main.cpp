@@ -17,6 +17,8 @@
 #include <FastCRC.h>
 #include <PacketSerial.h>
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "PulsePin.h"
 
@@ -258,6 +260,7 @@ void reset();
 void onPacketReceived(const uint8_t* buffer, size_t size);
 void processInstruction(const uint8_t* buf, size_t buf_sz);
 void dumpBuffer(const uint8_t* buffer, size_t size);
+void debugPrint(const char* msg);
 
 // Pulse pins and camera / ephys synchronization
 PulsePin* getPulsePinById(byte id);
@@ -374,11 +377,11 @@ void loop() {
   }
 
   if (packetSerialA.overflow()) {
-    EXTSERIAL.println("S_A overflow!");
+    debugPrint("S_A overflow!");
   }
 
   if (packetSerialB.overflow()) {
-    EXTSERIAL.println("S_B overflow!");
+    debugPrint("S_B overflow!");
   }
 
   // Check if timed pins need updates
@@ -591,15 +594,15 @@ void processInstruction(const uint8_t* buf, size_t buf_sz) {
 
     case instSET_STATE:
       stride = strideInstSTATE;
-      EXTSERIAL.println("instSet_State");
+      debugPrint("instSet_State");
       for (size_t pIdx = 5; pIdx + stride <= buf_sz; pIdx += stride) {
         target = buf[pIdx];
         for (size_t b = 0; b < sizeof(bul); b++) {
           bul.bytes[b] = buf[pIdx + 1 + b];
         }
-        EXTSERIAL.print(target, DEC);
-        EXTSERIAL.print(':');
-        EXTSERIAL.println(bul.slong);
+        char msg[24];
+        snprintf(msg, sizeof(msg), "%u:%ld", target, bul.slong);
+        debugPrint(msg);
         if (target >= nStates) {
           continue;
         }
@@ -608,23 +611,54 @@ void processInstruction(const uint8_t* buf, size_t buf_sz) {
       break;
 
     case instRESET:
-      EXTSERIAL.println("Resetting everything!");
+      debugPrint("Resetting everything!");
       reset();
       break;
 
     default:
-      EXTSERIAL.println("Unknown command");
+      debugPrint("Unknown command");
       break;
   }
 }
 
-void dumpBuffer(const uint8_t* buffer, size_t size) {
-  EXTSERIAL.println(size, DEC);
-  for (size_t i = 0; i < size; i++) {
-    EXTSERIAL.print(buffer[i], HEX);
-    EXTSERIAL.print(' ');
+// Best-effort diagnostics on EXTSERIAL (Serial1).
+//
+// Serial1 is deliberately never begin()'d: that would re-mux pins 0/1 to the
+// UART, and those two pads are the first entries of pinsDigitalIn[], reported
+// as bits 0 and 1 of packet.digitalIn. Enabling the UART would kill those two
+// acquisition channels silently.
+//
+// Without begin() nothing drains the 64 B TX ring, and
+// HardwareSerialIMXRT::write9bit() spins forever with no timeout once the ring
+// is full (HardwareSerial.cpp:585) - so an unguarded println() would hang the
+// firmware permanently. Writing only when the ring provably has room makes
+// that impossible: messages are dropped instead. Add EXTSERIAL.begin(115200)
+// in setup() (accepting the loss of digitalIn bits 0/1) and every message
+// below starts working with no other change.
+void debugPrint(const char* msg) {
+  const int len = static_cast<int>(strlen(msg));
+  if (EXTSERIAL.availableForWrite() >= len + 2) { // + "\r\n"
+    EXTSERIAL.println(msg);
   }
-  EXTSERIAL.println(' ');
+}
+
+void dumpBuffer(const uint8_t* buffer, size_t size) {
+  char msg[16];
+  snprintf(msg, sizeof(msg), "%u", static_cast<unsigned>(size));
+  debugPrint(msg);
+
+  // 16 bytes per line, so each write stays well inside the 64 B TX ring
+  const size_t bytesPerLine = 16;
+  char line[bytesPerLine * 3 + 1];
+  size_t pos = 0;
+
+  for (size_t i = 0; i < size; i++) {
+    pos += snprintf(line + pos, sizeof(line) - pos, "%02X ", buffer[i]);
+    if ((i + 1) % bytesPerLine == 0 || i + 1 == size) {
+      debugPrint(line);
+      pos = 0;
+    }
+  }
 }
 
 // PulsePin lookup
