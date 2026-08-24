@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 400 pio run -e teensy41)",
+      "Bash(pio run *)",
+      "mcp__clion__get_compiler_info",
+      "Bash(grep -rn \"USB_SERIAL\\\\|USB_TRIPLE\\\\|USB_DUAL\" ~/.platformio/platforms/teensy/builder/ 2>/dev/null | head -20)",
+      "Bash(touch src/main.cpp && pio run -e teensy41 -v 2>&1 | grep -m1 \"src/main.cpp.o\" | tr ' ' '\\\\n' | grep -E \"^-D\\(USB|LAYOUT\\)\" )",
+      "Bash(grep -rn -B4 \"SerialUSB1;\\\\|SerialUSB2;\" ~/.platformio/packages/framework-arduinoteensy/cores/teensy4/*.h | head -30)",
+      "mcp__clion__get_file_problems"
+    ]
+  }
+}
