@@ -55,6 +55,7 @@ const int nStates = 8;
 #define WHEEL_ENC_PINB 3
 #define WHEEL_ENC_SW 4
 #define BLICK 5
+#define SCANNER_FRAME_CLOCK 6
 #define SPEAKER 7
 #define LED_1 8
 #define PIN_CAMERA_FSTROBE 12
@@ -69,6 +70,7 @@ const int nStates = 8;
 #define SHOCK 31
 #define PRESHOCK 32
 #define LED_2 33
+#define SLM_STIM_TRIGGER 34
 #define TESTSHOCK 35
 #define EPHYS_TRIGGER 36
 #define EPHYS_SYNC 37
@@ -230,6 +232,14 @@ int Tone = 0;
 unsigned long triggertime = 1000;
 unsigned long tonelength = 0;
 unsigned long rewardtime = 0;
+
+
+// SLM stimulation
+bool slm_stim_armed = false;
+const int slm_stim_duration = 10;
+bool slm_stim_active = false;           // trigger currently held high
+unsigned long slm_stim_end_millis = 0;  // when to release the trigger
+int slm_frame_clock_prev = HIGH;        // frame clock level on the last tick
 
 volatile unsigned char counter = 0;
 volatile long bufferedStates[nStates];
@@ -401,6 +411,28 @@ void gather() {
   digitalWriteFast(GATHER_INDICATOR, HIGH); // toggle pin to indicate gather start
   dataPacket packet;
 
+  // SLM stimulation. Once armed, fire on the first falling edge of the scanner
+  // frame clock, hold SLM_STIM_TRIGGER for slm_stim_duration ms, and disarm.
+  //
+  // The frame clock level is sampled every tick whether armed or not, so the
+  // comparison is always against the immediately preceding tick rather than a
+  // stale level from whenever arming last happened. This block runs before the
+  // experiment state machines that arm it, so the edge that fires a stimulus is
+  // always one sampled strictly after the arming tick.
+  const int slm_frame_clock = digitalReadFast(SCANNER_FRAME_CLOCK);
+  if (slm_stim_armed && slm_frame_clock_prev == HIGH && slm_frame_clock == LOW) {
+    digitalWriteFast(SLM_STIM_TRIGGER, HIGH);
+    slm_stim_end_millis = current_millis + slm_stim_duration;
+    slm_stim_active = true;
+    slm_stim_armed = false;
+  }
+  slm_frame_clock_prev = slm_frame_clock;
+
+  if (slm_stim_active && current_millis >= slm_stim_end_millis) {
+    digitalWriteFast(SLM_STIM_TRIGGER, LOW);
+    slm_stim_active = false;
+  }
+
   if (ephys == 1) {
     ephysrand();
   } else {
@@ -508,6 +540,16 @@ void reset() {
   for (int i = 0; i < nPulsePins; i++) {
     pulsePins[i]->restart();
   }
+
+  // Drop any pending or in-flight SLM stimulus. Required because current_millis
+  // is zeroed above: a live slm_stim_end_millis would otherwise sit ~49 days in
+  // the future and hold the trigger high. Seed the edge detector from the pin so
+  // the first tick after a reset cannot see a phantom falling edge.
+  slm_stim_armed = false;
+  slm_stim_active = false;
+  slm_stim_end_millis = 0;
+  slm_frame_clock_prev = digitalReadFast(SCANNER_FRAME_CLOCK);
+
   interrupts();
 }
 
@@ -803,6 +845,7 @@ void AATC() {
   }
   if ((current_millis == triggertime) && (Tone == 1) && (n_sound1 < 3)) {
     // Tone CS+
+    slm_stim_armed = true;
     analogWriteFrequency(SPEAKER, 9000);
     analogWrite(SPEAKER, 127);
 
