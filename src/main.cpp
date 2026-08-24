@@ -151,6 +151,13 @@ struct dataPacket {
         digitalOut(0) {}
 };
 
+// Worst-case size of one data packet on the wire: the COBS-encoded payload
+// (size + size/254 + 1, see COBS::getEncodedBufferSize) plus the delimiter
+// byte, which PacketSerial::send() writes as a second, separate call. 72 B of
+// payload -> 74 B on the wire.
+const int packetWireSize =
+    static_cast<int>(sizeof(dataPacket) + sizeof(dataPacket) / 254 + 2);
+
 struct errorPacket {
   uint8_t type;            // 1 B, packet type
   uint8_t length;          // 1 B, packet size
@@ -346,8 +353,19 @@ void loop() {
 
   if (packetReady) {
     State.crc16 = CRC16.kermit((uint8_t*)&State, sizeof(State));
-    if (SerialUSB1) packetSerialA.send((byte*)&State, sizeof(State));
-    if (SerialUSB2) packetSerialB.send((byte*)&State, sizeof(State));
+
+    // Only write to a port that is open (configured + DTR asserted) and has
+    // room for a whole packet. usb_serialN_write() spins for up to
+    // TX_TIMEOUT_MSEC (120 ms) when the host holds the port open but stops
+    // draining it, which would stall the other port and the rest of loop()
+    // along with it. Packets are dropped rather than queued: gather()
+    // overwrites State every millisecond regardless.
+    if (SerialUSB1 && SerialUSB1.availableForWrite() >= packetWireSize) {
+      packetSerialA.send((byte*)&State, sizeof(State));
+    }
+    if (SerialUSB2 && SerialUSB2.availableForWrite() >= packetWireSize) {
+      packetSerialB.send((byte*)&State, sizeof(State));
+    }
 
     // Apply current state vector
     applyState(&State);
