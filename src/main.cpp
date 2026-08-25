@@ -132,7 +132,7 @@ union bytesToLong {
 };
 
 // Running packet count, incremented by every packet constructor
-volatile unsigned long packetCount = 0;
+static volatile unsigned long packetCount = 0;
 
 struct dataPacket {
   uint8_t type;               // 1 B, packet type
@@ -184,67 +184,74 @@ struct errorPacket {
 // 4. Global state
 // ---------------------------------------------------------------------------
 
-// Data transport
-FastCRC16 CRC16;
-PacketSerial packetSerialA;
-PacketSerial packetSerialB;
+// Globals below are static (internal linkage) unless something outside this
+// translation unit needs them. Entries commented out are currently unused; they
+// are kept rather than deleted so the original variable set stays visible.
 
-// Timing. current_millis / current_micros are also used by PulsePin
-IntervalTimer gatherTimer;
+// Data transport
+static FastCRC16 CRC16;
+static PacketSerial packetSerialA;
+static PacketSerial packetSerialB;
+
+// Timing. current_millis / current_micros are declared extern in PulsePin.h and
+// read from PulsePin.cpp, so they must keep external linkage - do not make them
+// static.
+static IntervalTimer gatherTimer;
 elapsedMicros current_micros;
 elapsedMillis current_millis;
 
 // Wheel encoder
-Encoder wheelEncoder(WHEEL_ENC_PINA, WHEEL_ENC_PINB);
+static Encoder wheelEncoder(WHEEL_ENC_PINA, WHEEL_ENC_PINB);
 
 // Timed output pins
-PulsePin* pulsePins[nPulsePins];
+static PulsePin* pulsePins[nPulsePins];
 
-// Moving average for lick detection
-const int windowSize = 10;    // size of moving average window
-int lickReadings[windowSize]; // the readings from the lick input
-int windowIndex = 0;          // the index of the current reading
-int totalLickReadings = 0;    // the running total
-int averageLickReadings = 0;  // the average
-int lickThresh = 2600;
-bool binaryLick = false;
+// Moving average for lick detection, superseded by the IR lick detector that
+// gather() thresholds directly
+// const int windowSize = 10;    // size of moving average window
+// int lickReadings[windowSize]; // the readings from the lick input
+// int windowIndex = 0;          // the index of the current reading
+// int totalLickReadings = 0;    // the running total
+// int averageLickReadings = 0;  // the average
+static int lickThresh = 2600;
+static bool binaryLick = false;
 
 // Intermediate values
-long encoderPosition = 0;
-int last_packet_took = 0;
-int reward = 0;
-int lick = 0;
-int lickBaselineCorr = 0;
-int lickBaseline = 0;
-int ipacket = 0;
-int frame = 0;
-int camera_trigger = 0;
-int ephys = 1;
-int rad = 0;
-int exper = 0;
-int preshock = 0;
-int epacket = 0;
-int t = 0;
-int iPacket = 0;
-int AATC_trigger = 0;
-int press_test = 0;
-int n_sound1 = 0;
-int n_sound2 = 0;
-int Tone = 0;
-unsigned long triggertime = 1000;
-unsigned long tonelength = 0;
-unsigned long rewardtime = 0;
+// long encoderPosition = 0;
+static int last_packet_took = 0;
+static int reward = 0;
+static int lick = 0;
+// int lickBaselineCorr = 0;
+// int lickBaseline = 0;
+// int ipacket = 0;
+// int frame = 0;
+static int camera_trigger = 0;
+static int ephys = 1;
+// int rad = 0;
+static int exper = 0;
+static int preshock = 0;
+// int epacket = 0;
+// int t = 0;
+static int iPacket = 0;
+static int AATC_trigger = 0;
+static int press_test = 0;
+static int n_sound1 = 0;
+static int n_sound2 = 0;
+static int Tone = 0;
+static unsigned long triggertime = 1000;
+static unsigned long tonelength = 0;
+static unsigned long rewardtime = 0;
 
 
 #ifdef SLM_EXPERIMENT
 // SLM stimulation
-bool slm_stim_armed = false;
+static bool slm_stim_armed = false;
 const int slm_stim_duration = 10;
 const int slm_stim_waittime = 10;
-bool slm_stim_active = false;           // trigger currently held high
-unsigned long slm_stim_end_millis = 0;  // when to release the trigger
-int slm_frame_clock_prev = HIGH;        // frame clock level on the last tick
-byte slm_stim_selected = 0;
+static bool slm_stim_active = false;           // trigger currently held high
+static unsigned long slm_stim_end_millis = 0;  // when to release the trigger
+static int slm_frame_clock_prev = HIGH;        // frame clock level on the last tick
+static byte slm_stim_selected = 0;
 
 // One-wire transmission of slm_stim_selected on SLM_STIM_SELECT. The line idles
 // LOW; a HIGH reset pulse of slmSelectResetTicks ms is followed by the 8 data
@@ -260,9 +267,9 @@ enum slmSelectPhase : uint8_t {
 };
 const uint8_t slmSelectResetTicks = 10;  // reset pulse length, ms
 const uint8_t slmSelectDataBits = 8;
-slmSelectPhase slm_select_phase = slmSelIdle;
-uint8_t slm_select_tick = 0;   // ticks elapsed in the current phase
-byte slm_select_byte = 0;      // slm_stim_selected, latched at transmission start
+static slmSelectPhase slm_select_phase = slmSelIdle;
+static uint8_t slm_select_tick = 0;  // ticks elapsed in the current phase
+static byte slm_select_byte = 0;     // slm_stim_selected, latched at tx start
 
 // slm_select_tick counts the pause, so a wait longer than the counter can hold
 // would wrap and never reach the comparison.
@@ -271,28 +278,28 @@ static_assert(slm_stim_waittime >= 0 && slm_stim_waittime <= 255,
 
 #endif
 
-volatile unsigned char counter = 0;
-volatile long bufferedStates[nStates];
+static volatile unsigned char counter = 0;
+static volatile long bufferedStates[nStates];
 
-volatile bool gatherNow = false;
-volatile bool packetReady = false;
+// volatile bool gatherNow = false;
+static volatile bool packetReady = false;
 
 // Pupil camera synchronization counter
-volatile uint16_t syncCounter = syncCounterMax;
-volatile uint16_t syncCounterFrameInterval = 100; // count N frames as 'clock'
-volatile byte syncCounterIdx = 0;
-volatile byte syncCounterSubIdx = 0;
-volatile bool updateSyncCounter = true;
+static volatile uint16_t syncCounter = syncCounterMax;
+static volatile uint16_t syncCounterFrameInterval = 100; // count N frames as 'clock'
+static volatile byte syncCounterIdx = 0;
+static volatile byte syncCounterSubIdx = 0;
+static volatile bool updateSyncCounter = true;
 
 // Current state, overwritten on every gather
-dataPacket State;
+static dataPacket State;
 
 // ---------------------------------------------------------------------------
 // 5. Forward declarations
 // ---------------------------------------------------------------------------
 
 // Acquisition
-void gather();
+static void gather();
 void applyState(dataPacket* packet);
 void reset();
 
@@ -304,7 +311,7 @@ void debugPrint(const char* msg);
 
 // Pulse pins and camera / ephys synchronization
 PulsePin* getPulsePinById(byte id);
-void syncBlink();
+static void syncBlink();
 void ephysrand();
 
 // Experiment state machines
@@ -437,7 +444,7 @@ void loop() {
 // ---------------------------------------------------------------------------
 
 // Acquisition tick, driven by gatherTimer
-void gather() {
+static void gather() {
   digitalWriteFast(GATHER_INDICATOR, HIGH); // toggle pin to indicate gather start
   dataPacket packet;
 
@@ -814,7 +821,7 @@ PulsePin* getPulsePinById(byte id) {
 // Synchronization pattern linking the camera to the teensy timing by
 // sending a pulsed pattern. The pattern is a counter clocked by the FSTROBE
 // signal from the camera.
-void syncBlink() {
+static void syncBlink() {
   if (!digitalReadFast(PIN_CAMERA_FSTROBE)) {
     digitalWriteFast(PIN_SYNC_LED, (syncCounter >> syncCounterIdx) & 0x1);
     updateSyncCounter = true;
