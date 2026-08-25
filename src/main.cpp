@@ -29,15 +29,16 @@
 // Serial port used for human readable diagnostics
 #define EXTSERIAL Serial1
 
+#define SLM_EXPERIMENT 1
 // Analog and digital channels scanned every gather tick
-const int pinsAnalogIn[] = {16, 17, 18, 19, 20, 21, 22, 23};
+const int pinsAnalogIn[] = {16, 17, 18, 19, 20, 21, 22};
 const int nAnalogIn = sizeof(pinsAnalogIn) / sizeof(pinsAnalogIn[0]);
 
 const int pinsDigitalIn[] = {0, 1, 2,  3,  4,  5,  6,  7,
                              8, 9, 10, 11, 12, 13, 14, 15};
 const int nDigitalIn = sizeof(pinsDigitalIn) / sizeof(pinsDigitalIn[0]);
 
-const int pinsDigitalOut[] = {24, 25, 26, 27, 28, 29, 30, 31,
+const int pinsDigitalOut[] = {23, 24, 25, 26, 27, 28, 29, 30, 31,
                               32, 33, 34, 35, 36, 37, 38, 39};
 const int nDigitalOut = sizeof(pinsDigitalOut) / sizeof(pinsDigitalOut[0]);
 
@@ -60,6 +61,7 @@ const int nStates = 8;
 #define LED_1 8
 #define PIN_CAMERA_FSTROBE 12
 #define LICK 17
+#define SLM_STIM_SELECT 23
 #define VALVE 24
 #define REWARD 25
 #define LICKDETECT 26
@@ -234,12 +236,40 @@ unsigned long tonelength = 0;
 unsigned long rewardtime = 0;
 
 
+#ifdef SLM_EXPERIMENT
 // SLM stimulation
 bool slm_stim_armed = false;
 const int slm_stim_duration = 10;
+const int slm_stim_waittime = 10;
 bool slm_stim_active = false;           // trigger currently held high
 unsigned long slm_stim_end_millis = 0;  // when to release the trigger
 int slm_frame_clock_prev = HIGH;        // frame clock level on the last tick
+byte slm_stim_selected = 0;
+
+// One-wire transmission of slm_stim_selected on SLM_STIM_SELECT. The line idles
+// LOW; a HIGH reset pulse of slmSelectResetTicks ms is followed by the 8 data
+// bits, MSB first, one bit per ms, then a settling pause of slm_stim_waittime ms
+// before the trigger may fire. All three durations are counted in gather()
+// ticks, which is why gatherTimer must stay at a 1000 us interval.
+enum slmSelectPhase : uint8_t {
+  slmSelIdle,   // line LOW, waiting for slm_stim_armed
+  slmSelReset,  // holding the reset pulse HIGH
+  slmSelData,   // shifting out the 8 data bits
+  slmSelWait,   // byte sent, holding the post-transmission pause
+  slmSelDone    // pause elapsed, waiting for the frame clock edge to fire
+};
+const uint8_t slmSelectResetTicks = 10;  // reset pulse length, ms
+const uint8_t slmSelectDataBits = 8;
+slmSelectPhase slm_select_phase = slmSelIdle;
+uint8_t slm_select_tick = 0;   // ticks elapsed in the current phase
+byte slm_select_byte = 0;      // slm_stim_selected, latched at transmission start
+
+// slm_select_tick counts the pause, so a wait longer than the counter can hold
+// would wrap and never reach the comparison.
+static_assert(slm_stim_waittime >= 0 && slm_stim_waittime <= 255,
+              "slm_stim_waittime must fit in slm_select_tick (uint8_t)");
+
+#endif
 
 volatile unsigned char counter = 0;
 volatile long bufferedStates[nStates];
@@ -411,20 +441,80 @@ void gather() {
   digitalWriteFast(GATHER_INDICATOR, HIGH); // toggle pin to indicate gather start
   dataPacket packet;
 
-  // SLM stimulation. Once armed, fire on the first falling edge of the scanner
-  // frame clock, hold SLM_STIM_TRIGGER for slm_stim_duration ms, and disarm.
+#ifdef SLM_EXPERIMENT
+  // SLM stimulation. Once armed, the selected stimulus index is clocked out on
+  // SLM_STIM_SELECT (reset pulse + 8 bits, MSB first, one bit per tick). Once
+  // that byte is fully on the wire and the line is back LOW, a settling pause of
+  // slm_stim_waittime ms runs, giving the SLM time to load the pattern; only
+  // then does the next falling edge of the scanner frame clock fire
+  // SLM_STIM_TRIGGER, which is held for slm_stim_duration ms before disarming.
   //
   // The frame clock level is sampled every tick whether armed or not, so the
   // comparison is always against the immediately preceding tick rather than a
   // stale level from whenever arming last happened. This block runs before the
   // experiment state machines that arm it, so the edge that fires a stimulus is
   // always one sampled strictly after the arming tick.
+  //
+  // The phases are exclusive per tick: a tick that advances the transmission or
+  // the pause never also fires the trigger, so the falling edge acted on is
+  // always at least slm_stim_waittime ms - in practice one tick more - after
+  // SLM_STIM_SELECT returned LOW.
   const int slm_frame_clock = digitalReadFast(SCANNER_FRAME_CLOCK);
-  if (slm_stim_armed && slm_frame_clock_prev == HIGH && slm_frame_clock == LOW) {
-    digitalWriteFast(SLM_STIM_TRIGGER, HIGH);
-    slm_stim_end_millis = current_millis + slm_stim_duration;
-    slm_stim_active = true;
-    slm_stim_armed = false;
+  switch (slm_select_phase) {
+    case slmSelIdle:
+      if (slm_stim_armed) {
+        // Latch the index so a later write to slm_stim_selected cannot corrupt
+        // the byte mid-transmission.
+        slm_select_byte = slm_stim_selected;
+        slm_select_tick = 0;
+        digitalWriteFast(SLM_STIM_SELECT, HIGH);
+        slm_select_phase = slmSelReset;
+      }
+      break;
+
+    case slmSelReset:
+      if (++slm_select_tick >= slmSelectResetTicks) {
+        slm_select_tick = 0;
+        digitalWriteFast(SLM_STIM_SELECT,
+                         (slm_select_byte >> (slmSelectDataBits - 1)) & 0x1);
+        slm_select_phase = slmSelData;
+      }
+      break;
+
+    case slmSelData:
+      if (++slm_select_tick >= slmSelectDataBits) {
+        // Last bit has been held for its full tick: return the line to idle.
+        digitalWriteFast(SLM_STIM_SELECT, LOW);
+        slm_select_tick = 0;
+        slm_select_phase = slmSelWait;
+      } else {
+        digitalWriteFast(
+            SLM_STIM_SELECT,
+            (slm_select_byte >> (slmSelectDataBits - 1 - slm_select_tick)) & 0x1);
+      }
+      break;
+
+    case slmSelWait:
+      if (!slm_stim_armed) {
+        // Arming was withdrawn (e.g. by reset()) during the pause.
+        slm_select_phase = slmSelIdle;
+      } else if (++slm_select_tick >= slm_stim_waittime) {
+        slm_select_phase = slmSelDone;
+      }
+      break;
+
+    case slmSelDone:
+      if (!slm_stim_armed) {
+        // Arming was withdrawn (e.g. by reset()) while the byte was going out.
+        slm_select_phase = slmSelIdle;
+      } else if (slm_frame_clock_prev == HIGH && slm_frame_clock == LOW) {
+        digitalWriteFast(SLM_STIM_TRIGGER, HIGH);
+        slm_stim_end_millis = current_millis + slm_stim_duration;
+        slm_stim_active = true;
+        slm_stim_armed = false;
+        slm_select_phase = slmSelIdle;
+      }
+      break;
   }
   slm_frame_clock_prev = slm_frame_clock;
 
@@ -432,6 +522,7 @@ void gather() {
     digitalWriteFast(SLM_STIM_TRIGGER, LOW);
     slm_stim_active = false;
   }
+#endif
 
   if (ephys == 1) {
     ephysrand();
@@ -541,14 +632,21 @@ void reset() {
     pulsePins[i]->restart();
   }
 
+#ifdef SLM_EXPERIMENT
   // Drop any pending or in-flight SLM stimulus. Required because current_millis
   // is zeroed above: a live slm_stim_end_millis would otherwise sit ~49 days in
   // the future and hold the trigger high. Seed the edge detector from the pin so
-  // the first tick after a reset cannot see a phantom falling edge.
+  // the first tick after a reset cannot see a phantom falling edge. Abandoning a
+  // partially sent select byte is safe: SLM_STIM_SELECT was driven LOW by the
+  // loop over pinsDigitalOut above, so the receiver sees a truncated packet and
+  // no trigger follows it.
   slm_stim_armed = false;
   slm_stim_active = false;
   slm_stim_end_millis = 0;
   slm_frame_clock_prev = digitalReadFast(SCANNER_FRAME_CLOCK);
+  slm_select_phase = slmSelIdle;
+  slm_select_tick = 0;
+#endif
 
   interrupts();
 }
@@ -845,7 +943,9 @@ void AATC() {
   }
   if ((current_millis == triggertime) && (Tone == 1) && (n_sound1 < 3)) {
     // Tone CS+
+#ifdef SLM_EXPERIMENT
     slm_stim_armed = true;
+#endif
     analogWriteFrequency(SPEAKER, 9000);
     analogWrite(SPEAKER, 127);
 
