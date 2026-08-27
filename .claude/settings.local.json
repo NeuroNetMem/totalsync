@@ -7,7 +7,15 @@
       "Bash(grep -rn \"USB_SERIAL\\\\|USB_TRIPLE\\\\|USB_DUAL\" ~/.platformio/platforms/teensy/builder/ 2>/dev/null | head -20)",
       "Bash(touch src/main.cpp && pio run -e teensy41 -v 2>&1 | grep -m1 \"src/main.cpp.o\" | tr ' ' '\\\\n' | grep -E \"^-D\\(USB|LAYOUT\\)\" )",
       "Bash(grep -rn -B4 \"SerialUSB1;\\\\|SerialUSB2;\" ~/.platformio/packages/framework-arduinoteensy/cores/teensy4/*.h | head -30)",
-      "mcp__clion__get_file_problems"
+      "mcp__clion__get_file_problems",
+      "Bash(grep -n \"write_buffer_free\\\\|usb_configuration\\\\|tx_noautoflush\\\\|transmit_previous_timeout\\\\|TX_TIMEOUT\" /Users/fpbattaglia/.platformio/packages/framework-arduinoteensy/cores/teensy4/usb_serial2.c | head -60)",
+      "Read(//Users/fpbattaglia/.platformio/packages/framework-arduinoteensy/cores/teensy4/**)",
+      "mcp__clion__get_run_configurations",
+      "Bash(python3 -)",
+      "Bash(grep -n \"teensy_loader\\\\|teensy_reboot\\\\|teensy_post_compile\\\\|UPLOAD\\\\|upload\" /Users/fpbattaglia/.platformio/platforms/teensy/builder/main.py | head -40)",
+      "Bash(python3 -c ' *)",
+      "Read(//Users/fpbattaglia/.platformio/packages/tool-teensy/**)",
+      "Bash(find /Users/fpbattaglia/Applications/CLion.app -iname \"*platformio*\" -o -iname \"*embedded*\" 2>/dev/null | head -20)"
     ]
   }
 }

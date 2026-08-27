@@ -404,16 +404,29 @@ void loop() {
   if (packetReady) {
     State.crc16 = CRC16.kermit((uint8_t*)&State, sizeof(State));
 
-    // Only write to a port that is open (configured + DTR asserted) and has
-    // room for a whole packet. usb_serialN_write() spins for up to
-    // TX_TIMEOUT_MSEC (120 ms) when the host holds the port open but stops
-    // draining it, which would stall the other port and the rest of loop()
-    // along with it. Packets are dropped rather than queued: gather()
-    // overwrites State every millisecond regardless.
-    if (SerialUSB1 && SerialUSB1.availableForWrite() >= packetWireSize) {
+    // Only write to a port that provably has room for a whole packet.
+    // usb_serialN_write() spins for up to TX_TIMEOUT_MSEC (120 ms) when the host
+    // holds the port open but stops draining it, which would stall the other
+    // port and the rest of loop() along with it. Packets are dropped rather
+    // than queued: gather() overwrites State every millisecond regardless.
+    //
+    // availableForWrite() maps to usb_serialN_write_buffer_free(), which counts
+    // idle TX transfer buffers. Transfers complete in order, so the buffer the
+    // writer would block on is the first to free up: the count is zero exactly
+    // when a write would spin. That makes this test sufficient on its own.
+    //
+    // Deliberately NOT gated on `if (SerialUSBn)`. That operator bool() is
+    // usb_configuration && DTR asserted on this interface && 15 ms settled - and
+    // DTR is set only when the host sends CDC_SET_CONTROL_LINE_STATE (usb.c:614).
+    // Hosts that open the port without asserting DTR (notably .NET
+    // System.IO.Ports.SerialPort, whose DtrEnable defaults to false) read and
+    // write normally but leave that flag clear forever, so the guard would drop
+    // every packet on a perfectly healthy port. Unplugged is handled anyway:
+    // usb_serialN_write() returns immediately when !usb_configuration.
+    if (SerialUSB1.availableForWrite() >= packetWireSize) {
       packetSerialA.send((byte*)&State, sizeof(State));
     }
-    if (SerialUSB2 && SerialUSB2.availableForWrite() >= packetWireSize) {
+    if (SerialUSB2.availableForWrite() >= packetWireSize) {
       packetSerialB.send((byte*)&State, sizeof(State));
     }
 
