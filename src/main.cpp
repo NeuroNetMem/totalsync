@@ -30,6 +30,8 @@
 #define EXTSERIAL Serial1
 
 #define SLM_EXPERIMENT 1
+#define SLM_DEBUG 1
+
 // Analog and digital channels scanned every gather tick
 const int pinsAnalogIn[] = {16, 17, 18, 19, 20, 21, 22};
 const int nAnalogIn = sizeof(pinsAnalogIn) / sizeof(pinsAnalogIn[0]);
@@ -73,7 +75,14 @@ const int nStates = 8;
 #define PRESHOCK 32
 #define LED_2 33
 #define SLM_STIM_TRIGGER 34
+// Pin 35 is shared: with SLM_DEBUG on it carries the simulated frame clock, so
+// TESTSHOCK is undefined and its writes in runExperiment() / runPreShock() are
+// compiled out rather than allowed to fight the clock for the same pad.
+#ifdef SLM_DEBUG
+#define DEBUG_FRAME_CLOCK_OUT 35
+#else
 #define TESTSHOCK 35
+#endif
 #define EPHYS_TRIGGER 36
 #define EPHYS_SYNC 37
 #define PIN_SYNC_LED 38
@@ -244,6 +253,20 @@ static unsigned long rewardtime = 0;
 
 
 #ifdef SLM_EXPERIMENT
+
+#ifdef SLM_DEBUG
+// Simulated scanner frame clock, so the SLM path can be exercised on the bench
+// with nothing attached to SCANNER_FRAME_CLOCK. debug_frame_clock replaces the
+// pin reading in gather() and is mirrored on DEBUG_FRAME_CLOCK_OUT for scoping.
+//
+// The low phase must stay above one gather() tick, or the falling edge can fall
+// between two samples and be missed - the same Nyquist limit the real clock is
+// subject to.
+static bool debug_frame_clock = false;
+static byte debug_frame_clock_high_millis = 26;
+static byte debug_frame_clock_low_millis = 4;
+static byte debug_frame_clock_tick = 0;  // ticks elapsed in the current phase
+#endif
 // SLM stimulation
 static bool slm_stim_armed = false;
 const int slm_stim_duration = 10;
@@ -479,7 +502,23 @@ static void gather() {
   // the pause never also fires the trigger, so the falling edge acted on is
   // always at least slm_stim_waittime ms - in practice one tick more - after
   // SLM_STIM_SELECT returned LOW.
+#ifdef SLM_DEBUG
+  // Drive the simulated frame clock in place of the pin. The phase durations are
+  // counted in gather() ticks, so they are milliseconds only while gatherTimer
+  // stays at a 1000 us interval - the same assumption the select transmission
+  // above makes. The level is toggled before it is sampled, so the tick that
+  // flips the clock is also the tick that sees the edge.
+  if (++debug_frame_clock_tick >= (debug_frame_clock
+                                       ? debug_frame_clock_high_millis
+                                       : debug_frame_clock_low_millis)) {
+    debug_frame_clock_tick = 0;
+    debug_frame_clock = !debug_frame_clock;
+  }
+  digitalWriteFast(DEBUG_FRAME_CLOCK_OUT, debug_frame_clock);
+  const int slm_frame_clock = debug_frame_clock ? HIGH : LOW;
+#else
   const int slm_frame_clock = digitalReadFast(SCANNER_FRAME_CLOCK);
+#endif
   switch (slm_select_phase) {
     case slmSelIdle:
       if (slm_stim_armed) {
@@ -663,9 +702,19 @@ void reset() {
   slm_stim_armed = false;
   slm_stim_active = false;
   slm_stim_end_millis = 0;
-  slm_frame_clock_prev = digitalReadFast(SCANNER_FRAME_CLOCK);
   slm_select_phase = slmSelIdle;
   slm_select_tick = 0;
+#ifdef SLM_DEBUG
+  // Restart the simulated clock from its low phase. The loop over pinsDigitalOut
+  // above has already driven DEBUG_FRAME_CLOCK_OUT low, so this keeps the
+  // variable and the pin in agreement instead of leaving the next tick to undo a
+  // forced level.
+  debug_frame_clock = false;
+  debug_frame_clock_tick = 0;
+  slm_frame_clock_prev = LOW;
+#else
+  slm_frame_clock_prev = digitalReadFast(SCANNER_FRAME_CLOCK);
+#endif
 #endif
 
   interrupts();
@@ -860,14 +909,18 @@ void runExperiment() {
     // Off period: keep pin LOW for a random time between 12 and 40 seconds
     if (iPacket == offInterval) {
       digitalWriteFast(SHOCK, HIGH);
+#ifndef SLM_DEBUG
       digitalWriteFast(TESTSHOCK, HIGH);
+#endif
       digitalWriteFast(LED_BUILTIN, HIGH);
     }
 
     // On period: 2 seconds HIGH
     if (iPacket == offInterval + 2000) {
       digitalWriteFast(SHOCK, LOW);
+#ifndef SLM_DEBUG
       digitalWriteFast(TESTSHOCK, LOW);
+#endif
       digitalWriteFast(LED_BUILTIN, LOW);
       iPacket = 0;      // Reset iPacket
       trialCount++;     // Increment the trial count
@@ -884,14 +937,18 @@ void runPreShock() {
     // Set the shock pins and the built-in LED to LOW for 30 seconds
     if (iPacket == 10000) {
       digitalWriteFast(SHOCK, HIGH);
+#ifndef SLM_DEBUG
       digitalWriteFast(TESTSHOCK, HIGH);
+#endif
       digitalWriteFast(LED_BUILTIN, HIGH);
     }
 
     if (iPacket == 12000) {
       digitalWriteFast(SHOCK, LOW);
       digitalWriteFast(LED_BUILTIN, LOW);
+#ifndef SLM_DEBUG
       digitalWriteFast(TESTSHOCK, LOW);
+#endif
       iPacket = 0;
     }
   }
