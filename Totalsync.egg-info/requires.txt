@@ -2,8 +2,10 @@ cobs
 pyserial
 numpy
 pyzmq
-pyglet
-sounddevice
 
 [:platform_system == "Windows"]
 windows-curses
+
+[extras]
+pyglet
+sounddevice
