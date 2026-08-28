@@ -15,7 +15,12 @@
       "Bash(grep -n \"teensy_loader\\\\|teensy_reboot\\\\|teensy_post_compile\\\\|UPLOAD\\\\|upload\" /Users/fpbattaglia/.platformio/platforms/teensy/builder/main.py | head -40)",
       "Bash(python3 -c ' *)",
       "Read(//Users/fpbattaglia/.platformio/packages/tool-teensy/**)",
-      "Bash(find /Users/fpbattaglia/Applications/CLion.app -iname \"*platformio*\" -o -iname \"*embedded*\" 2>/dev/null | head -20)"
+      "Bash(find /Users/fpbattaglia/Applications/CLion.app -iname \"*platformio*\" -o -iname \"*embedded*\" 2>/dev/null | head -20)",
+      "mcp__clion__get_all_open_file_paths",
+      "mcp__clion__read_file",
+      "Bash(grep -n \"void setup\" src/main.cpp; sed -n '/^void setup/,/^}/p' src/main.cpp | head -60)",
+      "Bash(~/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin/arm-none-eabi-nm -C .pio/build/teensy41/src/main.cpp.o)",
+      "Bash(xargs -I{} echo \"debug_frame symbols with SLM_DEBUG off: {}\")"
     ]
   }
 }
