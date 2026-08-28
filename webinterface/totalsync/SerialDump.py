@@ -2,29 +2,16 @@ import base64
 from pathlib import Path
 from datetime import datetime
 import logging
-import tkinter as tk
 from tkinter import filedialog
 
 
 def browse_button():
-    # Allow user to select a directory and store it in global var
-    # called folder_path
-    global folder_path
+    # Allow the user to select a directory to write the dump files into.
     filename = filedialog.askdirectory()
-    folder_path.set(filename)
     if filename == "":
         filename = "DataFile/"
 
     return filename
-
-
-root2 = tk.Tk()
-folder_path = tk.StringVar()
-lbl1 = tk.Label(master=root2, textvariable=folder_path)
-lbl1.grid(row=0, column=1)
-button2 = tk.Button(master=root2, text="Browse", command=browse_button)
-button2.grid(row=0, column=3)
-root2.destroy()
 
 
 class SerialDump:
