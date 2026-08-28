@@ -1,0 +1,17 @@
+README.md
+setup.py
+Totalsync.egg-info/PKG-INFO
+Totalsync.egg-info/SOURCES.txt
+Totalsync.egg-info/dependency_links.txt
+Totalsync.egg-info/entry_points.txt
+Totalsync.egg-info/requires.txt
+Totalsync.egg-info/top_level.txt
+webinterface/totalsync/CursesInterface.py
+webinterface/totalsync/Packet.py
+webinterface/totalsync/SerialDummy.py
+webinterface/totalsync/SerialDump.py
+webinterface/totalsync/TeensyCommander.py
+webinterface/totalsync/WebInterface.py
+webinterface/totalsync/__init__.py
+webinterface/totalsync/camera.py
+webinterface/totalsync/fake_picamera.py

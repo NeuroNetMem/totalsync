@@ -1,0 +1,2 @@
+[console_scripts]
+totalsync = webinterface.totalsync.TeensyCommander:cli_entry
