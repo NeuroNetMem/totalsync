@@ -47,6 +47,8 @@ class SerialDump:
         self.bin_file.write(arr)
 
     def __del__(self):
-        self.cobs_file.close()
-        self.bin_file.close()
-
+        # Either file is still None if no packet of that kind ever arrived, which is
+        # the normal case for .bin unless -B was given.
+        for handle in (self.cobs_file, self.bin_file):
+            if handle is not None:
+                handle.close()

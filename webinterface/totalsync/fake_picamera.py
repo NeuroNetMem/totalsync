@@ -21,7 +21,9 @@ class PiCamera:
     """Fake class"""
     resolution = (0, 0)
 
-    def __init__(self, resolution=None, framerate=None):
+    def __init__(self, resolution=None, framerate=None, **options):
+        # **options absorbs the rest of the real PiCamera signature (sensor_mode,
+        # led_pin, ...); camera.py passes sensor_mode=, which would be a TypeError.
         pass
 
     def __enter__(self):
@@ -43,7 +45,7 @@ class PiCamera:
         pass
 
     def capture(self, output, format=None, use_video_port=False, resize=None, splitter_port=0, bayer=False, **options):
-        raise NotImplemented
+        raise NotImplementedError
 
     def start_recording(self, output, format=None, resize=None, splitter_port=1, **options):
         pass
@@ -59,13 +61,13 @@ class PiCamera:
         pass
 
     def record_sequence(self, *args, **kwargs):
-        raise NotImplemented
+        raise NotImplementedError
 
     def capture_sequence(self, *args, **kwargs):
-        raise NotImplemented
+        raise NotImplementedError
 
     def capture_continuous(self, *args, **kwargs):
-        raise NotImplemented
+        raise NotImplementedError
 
     def close(self):
         pass

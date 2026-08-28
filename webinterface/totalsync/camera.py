@@ -12,7 +12,11 @@ from pathlib import Path
 try:
     import picamera
 except ImportError:
-    import fake_picamera as picamera
+    # picamera is Raspberry Pi only. Fall back to the stub so the module is at
+    # least importable and runnable elsewhere. This must be a package-relative
+    # import: `import fake_picamera` is an implicit relative import, which
+    # Python 3 removed, so it raised ModuleNotFoundError on every non-Pi host.
+    from webinterface.totalsync import fake_picamera as picamera
 
 # Create the html page for the stream
 PAGE = """\
