@@ -1,0 +1,134 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# ---------------------------------------------------------------------------
+# Packaging / build artifacts
+#
+# /build and /dist are anchored to the repo root on purpose: the vendored
+# webinterface/web/webgl-plot/dist is checked in and must not be ignored.
+# ---------------------------------------------------------------------------
+/build/
+/dist/
+/sdist/
+*.egg-info/
+*.egg
+.eggs/
+MANIFEST
+wheels/
+
+# ---------------------------------------------------------------------------
+# Virtual environments
+#
+# uv.lock is deliberately NOT ignored: TotalSync is an application, so the
+# lock file is what pins the exact versions the lab machines get.
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# ---------------------------------------------------------------------------
+# Test / type-check / lint caches
+# ---------------------------------------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# Recorded data and logs
+#
+# SerialDump writes <chosen dir>/<timestamp>.b64 (and .bin with -B); the
+# fallback when the directory chooser is cancelled is ./DataFile/.
+# CursesInterface refers to ./LogFile/.
+# ---------------------------------------------------------------------------
+DataFile/
+LogFile/
+*.b64
+
+# ---------------------------------------------------------------------------
+# Teensy / Arduino build output
+# ---------------------------------------------------------------------------
+*.hex
+*.elf
+*.bin
+.build/
+Teensy41_Totalsync/build/
+
+# ---------------------------------------------------------------------------
+# Node (only used to rebuild the vendored webgl-plot)
+# ---------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ---------------------------------------------------------------------------
+# JetBrains IDEs (PyCharm, CLion)
+#
+# Listed file by file rather than as a blanket `.idea/`, because the shared
+# settings under .idea/inspectionProfiles/ and .idea/vcs.xml are checked in.
+# ---------------------------------------------------------------------------
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/shelf/
+.idea/httpRequests/
+.idea/modules.xml
+.idea/misc.xml
+.idea/*.iml
+.idea/modules/
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+*.iml
+*.iws
+cmake-build-*/
+
+# ---------------------------------------------------------------------------
+# Other editors
+# ---------------------------------------------------------------------------
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# ---------------------------------------------------------------------------
+# Claude Code (per-developer permissions, not shared)
+# ---------------------------------------------------------------------------
+.claude/settings.local.json
+
+# ---------------------------------------------------------------------------
+# OS cruft — this project is run on Windows, macOS and Linux
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.directory
+.fuse_hidden*
+.nfs*
