@@ -17,12 +17,12 @@ GO to your TotalSync folder with this command
 cd \your_path\TotalSync
 ```
 ### Step 5
-Once in the folder you can use the following commad to install TotalSync
+Once in the folder you can use the following command to install TotalSync
 ````
 pip install -e .
 ````
-### Step 6 
-Following this installation you can start TotalSync with the command `totalsync` in the command prompt 
+### Step 6
+Following this installation you can start TotalSync with the command `totalsync` in the command prompt
 
 ### After installation
 
@@ -32,6 +32,6 @@ conda activate totalsync
 totalsync
 ```
 
-## Arduino 
+## Arduino
 
 Open the arduino code and send it in the teensy, you can modify it as wanted. Few examples are already available in this github
