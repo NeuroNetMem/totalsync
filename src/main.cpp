@@ -1018,44 +1018,55 @@ void AATC() {
     n_sound1 = 0;
     n_sound2 = 0;
   }
-  if ((current_millis == triggertime) && (Tone == 1) && (n_sound1 < 3)) {
+  if ((current_millis >= triggertime) && (Tone == 1) && (n_sound1 < 3)) {
     // Tone CS+
-#ifdef SLM_EXPERIMENT
-    slm_stim_armed = true;
-#endif
+#ifndef SLM_EXPERIMENT
+
     analogWriteFrequency(SPEAKER, 9000);
     analogWrite(SPEAKER, 127);
-
     digitalWriteFast(TONE1, HIGH);
+#endif
     rewardtime = triggertime + 3000;
     tonelength = triggertime + 2000;
+
+#ifdef SLM_DEBUG
+    triggertime = triggertime + 6000;
+#else
     triggertime = triggertime + random(29000, 45000);
+#endif
     n_sound1 += 1;
     n_sound2 = 0;
     Tone = random(2);
-  }
-  if (current_millis == tonelength) {
-    digitalWriteFast(TONE1, LOW);
-    digitalWriteFast(TONE2, LOW);
-    analogWrite(SPEAKER, 0);
-  }
-  if (current_millis == rewardtime) {
-    digitalWriteFast(REWARD, HIGH);
-  }
-  if (current_millis == rewardtime + 2000) {
-    digitalWriteFast(REWARD, LOW);
-  }
 
-  if ((current_millis == triggertime) && (Tone == 0) && (n_sound2 < 3)) {
+
+
+
+#ifndef SLM_EXPERIMENT
+    if (current_millis == tonelength) {
+      digitalWriteFast(TONE1, LOW);
+      digitalWriteFast(TONE2, LOW);
+      analogWrite(SPEAKER, 0);
+    }
+#endif
+    if (current_millis == rewardtime) {
+      digitalWriteFast(REWARD, HIGH);
+    }
+    if (current_millis == rewardtime + 2000) {
+      digitalWriteFast(REWARD, LOW);
+    }
+  }
+  if ((current_millis >= triggertime) && (Tone == 0) && (n_sound2 < 3)) {
     // Tone CS-
+#ifndef SLM_EXPERIMENT
     tone(SPEAKER, 3000, 2000);
-
     digitalWriteFast(TONE2, HIGH);
+#endif
     tonelength = triggertime + 2000;
     triggertime = triggertime + random(29000, 45000);
     Tone = random(2);
     n_sound2 += 1;
     n_sound1 = 0;
+
   }
   if (n_sound1 >= 3) {
     Tone = 0;
@@ -1063,4 +1074,16 @@ void AATC() {
   if (n_sound2 >= 3) {
     Tone = 1;
   }
+
+#ifdef SLM_EXPERIMENT
+  slm_stim_selected = Tone;
+
+#ifdef SLM_DEBUG
+  slm_stim_selected++;
+  if (slm_stim_selected >= 128) slm_stim_selected = 0;
+#else
+  slm_stim_selected = Tone;
+#endif
+  slm_stim_armed = true;
+#endif
 }
