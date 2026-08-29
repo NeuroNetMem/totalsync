@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "totalsync"
+version = "3"
+description = "Synchronization system"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "GPL-3.0-or-later"
+authors = [
+    { name = "Ronny Eichler" },
+    { name = "Morgane Audrain", email = "morganeaudrain@gmail.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "cobs",
+    "pyserial",
+    "numpy",
+    "pyzmq",
+    # On Linux/macOS `curses` is in the stdlib; only Windows needs the backport.
+    'windows-curses ; platform_system == "Windows"',
+]
+
+[project.optional-dependencies]
+extras = [
+	    "pyglet",
+    	"sounddevice",
+]
+# NOTE: the GUI also needs `tkinter`, which is part of the stdlib but is *not*
+# pip-installable. It ships with the python.org and conda builds; with Homebrew
+# python you need `brew install python-tk`, on Debian/Ubuntu `apt install python3-tk`.
+# `picamera` is Raspberry Pi only and is imported behind a try/except in camera.py.
+
+[project.scripts]
+totalsync = "webinterface.totalsync.TeensyCommander:cli_entry"
+
+[tool.setuptools]
+# `webinterface` has no __init__.py, so it is an implicit namespace package.
+# It is listed explicitly because the web assets below live directly under it.
+packages = [
+    "webinterface",
+    "webinterface.totalsync",
+    "webinterface.totalsync.websocket_server",
+]
+
+[tool.setuptools.package-data]
+# WebInterface.py serves <package>/../web, so those files must be installed too.
+webinterface = ["web/**/*"]
