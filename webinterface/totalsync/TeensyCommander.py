@@ -424,11 +424,29 @@ def menu(commander):
         if mb.askokcancel('Quit', 'Do you want to quit?', parent=win):
             quit_app()
 
+    # Raw packet count at the previous tick, so the delta can be reported.
+    last_count = [0]
+
+    def report_packet_count():
+        """Log the received-packet counters, once per watchdog tick."""
+        received = commander.serial_dump.n_raw_packets
+        new = received - last_count[0]
+        last_count[0] = received
+        msg = (f'Serial packets: {received} received (+{new}), '
+               f'{commander.n_packet} decoded, {commander.packets_per_second:.1f}/s')
+        if new:
+            logging.info(msg)
+        else:
+            # A silent port is the failure this counter exists to make visible, so
+            # say so at a level that survives the default verbosity.
+            logging.warning(msg + ' - nothing received since the last check!')
+
     def watchdog():
         """Periodic health check, rescheduled on the Tk event loop."""
         if not commander.alive:
             quit_app()
             return
+        report_packet_count()
         if commander.shell_gui and commander.shell_gui.alive and not commander.shell_gui.is_alive():
             logging.critical("Shell GUI died!")
             # TODO: attempt to restart the shell GUI

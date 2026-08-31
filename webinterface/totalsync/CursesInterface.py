@@ -101,6 +101,11 @@ class CursesUI(threading.Thread):
 
             w.addstr(1, 2, f"{self.commander.packets_per_second:06.1f} packets/s")
 
+            # Raw arrivals vs. successfully unpacked packets; a growing gap between
+            # the two means packets are coming in but not decoding.
+            w.addstr(2, 2, f"{self.commander.serial_dump.n_raw_packets} received, "
+                           f"{self.commander.n_packet} decoded")
+
             w.addstr(4, 2, f"PacketID {packet.packetID}")
             # w.refresh()
         except KeyboardInterrupt:

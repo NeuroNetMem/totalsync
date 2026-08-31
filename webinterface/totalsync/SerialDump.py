@@ -23,6 +23,13 @@ class SerialDump:
         self.cobs_file = None
         self.bin_file = None
 
+        # Counts every framed packet that came off the serial line, including those
+        # that later fail to COBS-decode or unpack: handle_raw runs before any of
+        # that happens (see Packet.PacketReceiver.handle_packet). Comparing it with
+        # TeensyCommander.n_packet, which only counts fully unpacked data packets,
+        # is what makes a flaky connection visible.
+        self.n_raw_packets = 0
+
     def handle_raw(self, arr):
         """Write the cobs-encoded, 0-terminated data as base64 encoded string to log file,
         one line per packet.
@@ -31,6 +38,11 @@ class SerialDump:
         removed by the serial packetizer. (This is completely unnecessary and here for backwards
         compatibility).
         """
+        # Count the arrival, not the successful write, so a full disk or a closed
+        # file does not hide the fact that the packet did come in. Only the serial
+        # ReaderThread ever increments this, so a plain += needs no lock.
+        self.n_raw_packets += 1
+
         # For future parsing, we need to re-append the line termination symbol \0.
         if self.cobs_file is None:
             logging.info(f"Opening COBS+Base64 serial dump file {self.f_b64.absolute()}")
