@@ -63,7 +63,7 @@ export class Plot {
 
 function getColor(rgb) {
     let sep = rgb.indexOf(",") > -1 ? "," : " ";
-    rgb = rgb.substr(4).split(")")[0].split(sep);
+    rgb = rgb.substring(4).split(")")[0].split(sep);
     let r = parseInt(rgb[0]),
         g = parseInt(rgb[1]),
         b = parseInt(rgb[2]);
