@@ -40,7 +40,7 @@ const int pinsDigitalIn[] = {0, 1, 2,  3,  4,  5,  6,  7,
                              8, 9, 10, 11, 12, 13, 14, 15};
 const int nDigitalIn = sizeof(pinsDigitalIn) / sizeof(pinsDigitalIn[0]);
 
-const int pinsDigitalOut[] = {23, 24, 25, 26, 27, 28, 29, 30, 31,
+const int pinsDigitalOut[] = {24, 25, 26, 27, 28, 29, 30, 31,
                               32, 33, 34, 35, 36, 37, 38, 39};
 const int nDigitalOut = sizeof(pinsDigitalOut) / sizeof(pinsDigitalOut[0]);
 
@@ -63,7 +63,6 @@ const int nStates = 8;
 #define LED_1 8
 #define PIN_CAMERA_FSTROBE 12
 #define LICK 17
-#define SLM_STIM_SELECT 23
 #define VALVE 24
 #define REWARD 25
 #define LICKDETECT 26
@@ -72,8 +71,14 @@ const int nStates = 8;
 #define TRIGGER_AATC 29
 #define EXPER 30
 #define SHOCK 31
+#ifdef SLM_DEBUG
+#define SLM_DEBUG_OUT 32
+#else
 #define PRESHOCK 32
-#define LED_2 33
+#endif
+#ifdef SLM_EXPERIMENT
+#define SLM_STIM_SELECT 33
+
 #define SLM_STIM_TRIGGER 34
 // Pin 35 is shared: with SLM_DEBUG on it carries the simulated frame clock, so
 // TESTSHOCK is undefined and its writes in runExperiment() / runPreShock() are
@@ -83,6 +88,10 @@ const int nStates = 8;
 #else
 #define TESTSHOCK 35
 #endif
+#else
+#define LED_2 33
+#endif
+
 #define EPHYS_TRIGGER 36
 #define EPHYS_SYNC 37
 #define PIN_SYNC_LED 38
@@ -347,13 +356,13 @@ void AATC();
 // ---------------------------------------------------------------------------
 
 void setup() {
-  pinMode(ledPin, OUTPUT);
-  pinMode(LED_1, OUTPUT); // your first LED
-  pinMode(LED_2, OUTPUT);
+  // pinMode(ledPin, OUTPUT);
+  // pinMode(LED_1, OUTPUT); // your first LED
+  // pinMode(LED_2, OUTPUT);
 
   // Turn them on
-  digitalWriteFast(LED_1, HIGH);
-  digitalWriteFast(LED_2, HIGH);
+  // digitalWriteFast(LED_1, HIGH);
+  // digitalWriteFast(LED_2, HIGH);
 
   // Analog input channels
   analogReadResolution(16); // change the resolution to 16 bits and read A0
@@ -516,6 +525,12 @@ static void gather() {
   }
   digitalWriteFast(DEBUG_FRAME_CLOCK_OUT, debug_frame_clock);
   const int slm_frame_clock = debug_frame_clock ? HIGH : LOW;
+  // write the status of slm_stim_armed to SLM_DEBUG_OUT
+  if (slm_stim_armed)
+    digitalWriteFast(SLM_DEBUG_OUT, HIGH);
+  else
+    digitalWriteFast(SLM_DEBUG_OUT, LOW);
+
 #else
   const int slm_frame_clock = digitalReadFast(SCANNER_FRAME_CLOCK);
 #endif
@@ -622,9 +637,16 @@ static void gather() {
   reward = digitalReadFast(REWARD);
   // ephys = digitalReadFast(ephys_trigger);
   exper = digitalReadFast(EXPER);
+#ifdef SLM_DEBUG
+  preshock = false;
+#else
   preshock = digitalReadFast(PRESHOCK);
+#endif
+#ifdef SLM_DEBUG
+  AATC_trigger = true;
+#else
   AATC_trigger = digitalReadFast(TRIGGER_AATC);
-
+#endif
   // With the IR lick detector we don't need a moving average anymore
   lick = analogRead(LICK);
 
@@ -1020,8 +1042,12 @@ void AATC() {
   }
   if ((current_millis >= triggertime) && (Tone == 1) && (n_sound1 < 3)) {
     // Tone CS+
-#ifndef SLM_EXPERIMENT
-
+#ifdef SLM_EXPERIMENT
+    slm_stim_armed = true;
+#ifdef SLM_DEBUG
+    slm_stim_selected++;
+#endif
+#else
     analogWriteFrequency(SPEAKER, 9000);
     analogWrite(SPEAKER, 127);
     digitalWriteFast(TONE1, HIGH);
@@ -1057,12 +1083,22 @@ void AATC() {
   }
   if ((current_millis >= triggertime) && (Tone == 0) && (n_sound2 < 3)) {
     // Tone CS-
-#ifndef SLM_EXPERIMENT
+#ifdef SLM_EXPERIMENT
+    slm_stim_armed = true;
+#ifdef SLM_DEBUG
+    slm_stim_selected++;
+#endif
+#else
     tone(SPEAKER, 3000, 2000);
     digitalWriteFast(TONE2, HIGH);
 #endif
     tonelength = triggertime + 2000;
+
+#ifdef SLM_DEBUG
+    triggertime = triggertime + 6000;
+#else
     triggertime = triggertime + random(29000, 45000);
+#endif
     Tone = random(2);
     n_sound2 += 1;
     n_sound1 = 0;
@@ -1076,14 +1112,12 @@ void AATC() {
   }
 
 #ifdef SLM_EXPERIMENT
-  slm_stim_selected = Tone;
 
 #ifdef SLM_DEBUG
-  slm_stim_selected++;
   if (slm_stim_selected >= 128) slm_stim_selected = 0;
 #else
   slm_stim_selected = Tone;
 #endif
-  slm_stim_armed = true;
+
 #endif
 }
