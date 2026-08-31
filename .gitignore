@@ -132,3 +132,4 @@ $RECYCLE.BIN/
 .directory
 .fuse_hidden*
 .nfs*
+/.idea/webResources.xml
