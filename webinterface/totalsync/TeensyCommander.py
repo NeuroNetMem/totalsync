@@ -18,6 +18,7 @@ except ImportError:
     curses = None
 
 from webinterface.totalsync.Packet import PacketReceiver, pack_command_packet, pack_reset_packet
+from webinterface.totalsync.PinSheet import load_pin_labels
 from webinterface.totalsync.SerialDump import SerialDump
 from webinterface.totalsync.SerialDummy import SerialDummy
 from webinterface.totalsync.WebInterface import WebInterface, WS_PORT, HTTP_PORT
@@ -28,6 +29,18 @@ ZMQ_SERVER_SUB_PORT = 5681
 
 # The web interface is served by our own HTTP server, see WebInterface.WEB_DIRECTORY.
 WEB_URL = f'http://localhost:{HTTP_PORT}/index.html'
+
+
+def open_web_interface():
+    """Open the interface in a browser.
+
+    The nonce makes the URL one the browser has never seen, so the request has to
+    reach the server rather than being answered from cache. Without it, an
+    index.html cached before this port started serving redirects would be reused,
+    and the redirect that points at the current assets never seen.
+    """
+    webbrowser.open_new(f'{WEB_URL}?t={time.time_ns():x}')
+
 
 # Fallback when neither --serial_port nor the startup dialog supplies a port. There is
 # no useful cross-platform default: on POSIX the devices are /dev/cu.* or /dev/ttyUSB*
@@ -116,7 +129,7 @@ def welcome_dialog():
     def on_play():
         # The HTTP server is not running yet; the 'Reload' button on the next
         # window exists to retry once it is.
-        webbrowser.open_new(WEB_URL)
+        open_web_interface()
         win.destroy()
 
     def on_quit():
@@ -148,7 +161,8 @@ def welcome_dialog():
 
 
 class TeensyCommander:
-    def __init__(self, serial_port, http_port, ws_port, curses_screen, write_bin=False, use_dummy=False):
+    def __init__(self, serial_port, http_port, ws_port, curses_screen, write_bin=False, use_dummy=False,
+                 channel_labels=None):
         self.n_packet = 0
         self.packets_per_second = 0
         self.packet_timings = []
@@ -171,7 +185,7 @@ class TeensyCommander:
 
         self.serial_dump = SerialDump()
         self.serial_port = serial_port
-        self.web_server = WebInterface(http_port, ws_port, self)
+        self.web_server = WebInterface(http_port, ws_port, self, channel_labels=channel_labels)
 
         try:
             self.serial = serial.Serial(self.serial_port)
@@ -309,7 +323,7 @@ class TeensyCommander:
             self.serial.close()
 
 
-def main(screen, cli_args):
+def main(screen, cli_args, channel_labels=None):
     # SerialDump() opens a tkinter directory chooser, so a root must already exist.
     get_root()
     logging.info(
@@ -322,7 +336,8 @@ def main(screen, cli_args):
                          ws_port=cli_args.ws_port,
                          curses_screen=screen,
                          write_bin=cli_args.binfile,
-                         use_dummy=cli_args.dummy)
+                         use_dummy=cli_args.dummy,
+                         channel_labels=channel_labels)
     try:
         tc.run_forever()
     except KeyboardInterrupt:
@@ -345,6 +360,10 @@ def cli_entry():
     parser.add_argument('-D', '--dummy', action='store_true',
                         help='Use serial dummy if no valid serial device available')
     parser.add_argument('-v', '--verbose', action='count', default=2, help="Increase logging verbosity")
+    parser.add_argument('--pinsheet', default=None, metavar='PATH',
+                        help='pinSheet.json describing what each pin is wired to. Channels with '
+                             'a "for" entry are labelled with it in the web interface; the rest '
+                             'keep their default names.')
 
     cli_args = parser.parse_args()
 
@@ -376,6 +395,10 @@ def cli_entry():
     # logging.getLogger().addHandler(log_file)
     logging.getLogger().setLevel(loglevel)
 
+    # Read the pin sheet before anything opens: a bad path should fail here, not
+    # after the serial port and the servers are already up.
+    channel_labels = load_pin_labels(cli_args.pinsheet) if cli_args.pinsheet else {}
+
     # Only ask interactively when no port was given on the command line, so that
     # --help and scripted runs never open a window.
     if cli_args.serial_port is None:
@@ -387,9 +410,9 @@ def cli_entry():
         cli_args.serial_port = port or DEFAULT_SERIAL_PORT
 
     if cli_args.curses and curses is not None:
-        curses.wrapper(main, cli_args)
+        curses.wrapper(main, cli_args, channel_labels)
     else:
-        main(None, cli_args)
+        main(None, cli_args, channel_labels)
 
 
 def menu(commander):
@@ -415,10 +438,10 @@ def menu(commander):
 
     def on_reset():
         commander.reset_packet()
-        webbrowser.open_new(WEB_URL)
+        open_web_interface()
 
     def on_reload():
-        webbrowser.open_new(WEB_URL)
+        open_web_interface()
 
     def on_close():
         if mb.askokcancel('Quit', 'Do you want to quit?', parent=win):

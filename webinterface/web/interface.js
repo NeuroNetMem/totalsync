@@ -74,7 +74,17 @@ let message_queue = [];
 //let game;
 let camera;
 
-createUI();
+// Labels from the pin sheet totalsync was started with, keyed by channel name:
+// {"digital_input_2": "Wheel Encoder A", ...}. The server bakes these into
+// index.html (see WebInterface.send_index), so they are here before the first line
+// is drawn; empty when totalsync was started without --pinsheet.
+const channelLabels = window.CHANNEL_LABELS ?? {};
+// Says in the console whether the labels reached the page, so "the names are not
+// showing" can be told apart from "totalsync was started without --pinsheet" without
+// having to read the DOM.
+console.info(`Channel labels from pin sheet: ${Object.keys(channelLabels).length}`);
+
+createUI(channelLabels);
 init();
 
 // Resize Handling, to prevent recalculation spam during event
@@ -113,15 +123,23 @@ function newFrame() {
 
 requestAnimationFrame(newFrame);
 
-function add_label(grid, channel_name, color, box = null, buttons = null) {
+function add_label(grid, channel_name, color, box = null, buttons = null, labels = {}) {
     const div = document.createElement("div");
     div.className = "label";
     div.id = channel_name;
     div.style.backgroundColor = color;
+    // Hovering the row still tells you which channel it is when a pin sheet label
+    // has replaced the name. It goes on the row, not on the text: .channel_name is
+    // pointer-events:none, and an element that takes no pointer events shows no
+    // tooltip either.
+    div.title = channel_name;
     const p = document.createElement("div");
     p.className = "channel_name";
     p.id = channel_name;
-    p.textContent = channel_name;
+    // What the pin is wired to, when the pin sheet says so. Only the displayed text
+    // changes: the element ids stay as they are, because the buttons and the value
+    // fields are addressed through them, and so is the channel order in the plot.
+    p.textContent = labels[channel_name] ?? channel_name;
 
     if (box != null) {
         div.appendChild(box);
@@ -157,7 +175,7 @@ function add_spaceholder(grid, channel_name, numLines, numLines_max) {
     return div;
 }
 
-function createUI() {
+function createUI(labels = {}) {
     let addholder = true;
     for (const [canvasID, cfg] of Object.entries(plotConfig)) {
         let numLines_max = cfg.numLines;
@@ -198,7 +216,7 @@ function createUI() {
                         return btn;
                     });
                 }
-                add_label(label_grid, `${partitionID}_${i}`, color, box, buttons);
+                add_label(label_grid, `${partitionID}_${i}`, color, box, buttons, labels);
 
 
             }

@@ -72,6 +72,12 @@ canvas {
     position: absolute;
     top: 50%;
     transform: translate(20px, -55%);
+    /* Pin sheet labels ("Scanner Frame Clock (Input)") are far longer than the
+       generated channel names. Keep them on one line, or they wrap over the rows
+       above and below; and let clicks through, since this box is positioned and
+       would otherwise paint over the TOGGLE/ON/OFF buttons it overlaps. */
+    white-space: nowrap;
+    pointer-events: none;
 }
 
 .digital_button {
