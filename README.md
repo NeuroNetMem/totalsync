@@ -1,36 +1,42 @@
 # TotalSync
 
+[![Documentation](https://readthedocs.org/projects/totalsync/badge/?version=latest)](https://totalsync.readthedocs.io/en/latest/)
+
 TotalSync is a low-cost, open-source teensy-based synchronization system for multiple
 recording techniques.
 
+**[Read the documentation →](https://totalsync.readthedocs.io)**
+
 <p align="left">
-  <img src="Documentation/images/Module_totalsync_Figure1.png" width=50% height=50%><img src="Documentation/images/GUI_Figure1.png" width=50% height=50%>
+  <img src="docs/images/Module_totalsync_Figure1.png" width=50% height=50%><img src="docs/images/GUI_Figure1.png" width=50% height=50%>
  </p>
 
 ## Getting started
 
- * **[General Introduction to TotalSync](Documentation/introduction.md)**
- * **[Installation](Documentation/instruction.md)**
- * **[Quick Start](Documentation/start.md)**
- * **[Pin usage](Documentation/Running_instructions.md)**
- * **[Extending TotalSync for new devices](Documentation/update.md)**
- * **[Videos and images](Documentation/images)**
+ * **[General Introduction to TotalSync](docs/introduction.md)**
+ * **[Installation](docs/installation.md)**
+ * **[Quick start](docs/quickstart.md)**
+ * **[Pin usage](docs/pin-usage.md)**
+ * **[Extending TotalSync for new devices](docs/extending.md)**
+ * **[Videos and images](docs/images)**
 
-## Analysis tools
+## Command reference
 
- * **[`totalsync-decode`](Documentation/totalsync-decode.md)** — decode recorded `.b64`
+ * **[`totalsync`](docs/totalsync.md)** — record a session and serve the live
+   browser interface
+ * **[`totalsync-decode`](docs/totalsync-decode.md)** — decode recorded `.b64`
    files into numpy, MATLAB or pynapple formats, with named channels
- * **[`totalsync-pinsheet`](Documentation/totalsync-pinsheet.md)** — generate the
+ * **[`totalsync-pinsheet`](docs/totalsync-pinsheet.md)** — generate the
    `pinSheet.json` channel map from the Teensy firmware source
- * **[`totalsync-2p`](Documentation/totalsync-2p.md)** — align ScanImage two-photon
+ * **[`totalsync-2p`](docs/totalsync-2p.md)** — align ScanImage two-photon
    recordings with TotalSync telemetry
 
 ## Recording techniques
 
- * **[Two-photon microscopy](Documentation/2p.md)**
- * **[Voltage sensitive imaging](Documentation/vsi.md)**
- * **[Electrophysiology / Neuropixel](Documentation/electrophysiology.md)**
- * **[Virtual reality](Documentation/vr.md)**
+ * **[Voltage sensitive imaging](docs/vsi.md)**
+
+Chapters for two-photon microscopy, electrophysiology / Neuropixel and virtual reality
+are planned; the placeholder files under `docs/` are not published yet.
 
 ## Repository layout
 
@@ -46,7 +52,7 @@ dependencies.
 | `packages/totalsync_2p` | `totalsync-2p` | `totalsync-2p` |
 | `.` | `totalsync` | umbrella that depends on the three above |
 
-`Teensy41_Totalsync/` holds the firmware, and `Documentation/` the documentation above.
+`Teensy41_Totalsync/` holds the firmware, and `docs/` the documentation above.
 
 ## Contribute
 

@@ -53,7 +53,7 @@ Passing a `pinSheet.json` via `-p` replaces the raw indexed arrays with named ch
 
 With this mapping, the decoded dict will contain keys like `"Scanner Frame Clock (Input)"`, `"Lick Detection"`, `"uncorrected_distance"`, etc. instead of `digitalIn`, `analog`, and `longVar`.
 
-See `Documentation/pinSheet_2026.json` for a full example.
+See `docs/pinSheet_2026.json` for a full example.
 
 ## Output formats
 
@@ -113,13 +113,13 @@ totalsync-decode /data/session01
 totalsync-decode /data/session01 -o /output/session01
 
 # Save as .mat with named channels from a pin sheet
-totalsync-decode /data/session01 -o /output/session01 -p Documentation/pinSheet_2026.json
+totalsync-decode /data/session01 -o /output/session01 -p docs/pinSheet_2026.json
 
 # Save as pynapple Tsd files with named channels
-totalsync-decode /data/session01 -o /output/session01 -f pynapple -p Documentation/pinSheet_2026.json
+totalsync-decode /data/session01 -o /output/session01 -f pynapple -p docs/pinSheet_2026.json
 
 # Concatenate multiple sessions into a single set of pynapple files
-totalsync-decode /data/all_sessions -o /output/concatenated -f pynapple --concatenate -p Documentation/pinSheet_2026.json
+totalsync-decode /data/all_sessions -o /output/concatenated -f pynapple --concatenate -p docs/pinSheet_2026.json
 
 # Save as .npy, suppress progress bar
 totalsync-decode /data/session01 -o /output/session01 -f npy -q

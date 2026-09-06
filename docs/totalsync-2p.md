@@ -63,11 +63,11 @@ and `barcode_frame_matches`.
 ```bash
 # One session
 totalsync-2p --tif-files rec01.tif --b64-files rec01.b64 \
-             --output-dir out/rec01 --pin-sheet Documentation/pinSheet_2026.json
+             --output-dir out/rec01 --pin-sheet docs/pinSheet_2026.json
 
 # A day's recordings, paired in order
 totalsync-2p --tif-files day1/*.tif --b64-files day1/*.b64 \
-             --output-dir out/day1 --pin-sheet Documentation/pinSheet_2026.json
+             --output-dir out/day1 --pin-sheet docs/pinSheet_2026.json
 ```
 
 Beware of shell globbing in the second form: it only pairs correctly if both patterns

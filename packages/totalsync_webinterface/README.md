@@ -1,16 +1,16 @@
 # totalsync-webinterface
 
-Acquisition side of [TotalSync](https://github.com/*/TotalSync): reads packets from a
+Acquisition side of [TotalSync](https://github.com/fpbattaglia/totalsync): reads packets from a
 Teensy 4.1 running the TotalSync firmware over USB serial, records them, and serves a
 live view of all 42 digital/analog channels plus 8 state variables to the browser at
 1 kHz.
 
 Installs the `totalsync` command. See the
-[installation guide](../../Documentation/instruction.md) and
-[running instructions](../../Documentation/Running_instructions.md).
+[installation guide](../../docs/installation.md) and
+[running instructions](../../docs/pin-usage.md).
 
 ```bash
-totalsync --pinsheet Documentation/pinSheet_2026.json
+totalsync --pinsheet docs/pinSheet_2026.json
 totalsync -D                 # simulated Teensy, no hardware needed
 ```
 

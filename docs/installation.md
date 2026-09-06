@@ -22,7 +22,7 @@ It runs on Windows, macOS and Linux.
 
 ---
 
-## 1. Requirements
+## Requirements
 
 * **Python 3.11 or newer.**
 * **Tkinter**, which the graphical dialogs of the `totalsync` command need — the
@@ -32,9 +32,9 @@ It runs on Windows, macOS and Linux.
   * **Homebrew** Python (macOS) — `brew install python-tk`
   * **Debian / Ubuntu** — `sudo apt install python3-tk`
   * **Fedora** — `sudo dnf install python3-tkinter`
-* A **Teensy** running the TotalSync firmware (see [Teensy firmware](#5-teensy-firmware)).
+* A **Teensy** running the TotalSync firmware (see [Teensy firmware](#teensy-firmware)).
   You can install and try the software without one — see the `-D` flag under
-  [Running TotalSync](#4-running-totalsync).
+  [Running TotalSync](#running-totalsync).
 
 `windows-curses` is required only on Windows and is installed automatically there.
 
@@ -62,12 +62,12 @@ alongside it.
 
 ---
 
-## 2. Installing from PyPI
+## Installing from PyPI
 
 This is the route for **using** TotalSync rather than developing it.
 
 > TotalSync is not published on PyPI yet. Until it is, use
-> [Installing from source](#3-installing-from-source).
+> [Installing from source](#installing-from-source).
 
 ### Recommended: as a standalone tool
 
@@ -115,7 +115,7 @@ pip install totalsync
 
 ---
 
-## 3. Installing from source
+## Installing from source
 
 Use this if you want to modify TotalSync, or before it is published to PyPI.
 
@@ -200,7 +200,7 @@ With plain pip: `pip install -e ".[extras]"` or `pip install "totalsync[extras]"
 
 ---
 
-## 4. Running TotalSync
+## Running TotalSync
 
 Start it with:
 
@@ -209,54 +209,21 @@ totalsync
 ```
 
 (or `uv run totalsync` from a source checkout). A startup window opens and asks which
-serial port the Teensy is on. Useful command-line options:
+serial port the Teensy is on, and the ports it detected are listed in the terminal.
 
-| Option | Meaning |
-| --- | --- |
-| `-s`, `--serial_port` | Serial port of the Teensy. Skips the startup dialog. |
-| `-D`, `--dummy` | Use a simulated Teensy — lets you try TotalSync with no hardware. |
-| `-B`, `--binfile` | Also write a decoded binary dump alongside the base64 one. |
-| `-C`, `--curses` | Show the text-mode status interface in the terminal. |
-| `-H`, `--http_port` | Port for the web interface (default 8000). |
-| `-w`, `--ws_port` | Port for the WebSocket server (default 5678). |
-| `--pinsheet` | A `pinSheet.json` saying what each pin is wired to. Channels with a `"for"` entry are labelled with it in the browser interface instead of their generated names; the rest keep those names. |
-| `-v`, `--verbose` | More logging detail. Logging is already at info level by default; `-v` switches it to debug. |
-
-Run `totalsync --help` for the full list.
-
-Serial port names differ per platform. The startup dialog offers a drop-down of the
-ports it detects, and the same list is written to the terminal when TotalSync starts, so
-you normally do not need to look them up yourself. For reference, they look like:
-
-* **Windows** — `COM3`, `COM9`, …
-* **macOS** — `/dev/cu.usbmodem14201`, …
-* **Linux** — `/dev/ttyACM0`, `/dev/ttyUSB0`, …
-
-On Linux you may need to be in the `dialout` group to open the port:
-`sudo usermod -a -G dialout $USER` (then log out and back in).
-
-To try things out without a Teensy attached:
+To check the install without a Teensy attached:
 
 ```bash
 totalsync -D
 ```
 
-To see your own channel names in the interface rather than `digital_input_6`, pass a pin
-sheet. `Documentation/pinSheet_2026.json` is the one for the OFL rig; generate your own
-from the firmware with [`totalsync-pinsheet`](totalsync-pinsheet.md), then edit the
-`"for"` fields to match how the rig is actually wired:
+The command-line options, the platform-specific serial port names, and how to get your
+own channel names into the interface are in the [`totalsync` reference](totalsync.md).
+The analysis commands have their own pages too: [`totalsync-decode`](totalsync-decode.md),
+[`totalsync-pinsheet`](totalsync-pinsheet.md) and [`totalsync-2p`](totalsync-2p.md).
 
-```bash
-totalsync --pinsheet Documentation/pinSheet_2026.json
-```
-
-The browser console reports how many labels it received (`Channel labels from pin sheet:
-29`), which is the quickest way to tell a missing `--pinsheet` from a sheet whose channel
-names do not match.
-
-For what to do once it is running, see the rest of the documentation linked from the
-[README](../README.md) — in particular [Quick Start](start.md) and the pin assignments in
-[Running instructions](Running_instructions.md).
+Once it is running, see [Quick Start](quickstart.md) and the pin assignments in
+[Pin usage](pin-usage.md).
 
 ---
 
@@ -328,9 +295,9 @@ When you change dependencies, commit the updated `uv.lock` along with `pyproject
 
 ---
 
-## 5. Teensy firmware
+## Teensy firmware
 
 Open `Teensy41_Totalsync/Teensy41_Totalsync.ino` in the Arduino IDE and upload it to the
 Teensy. You can modify it as needed; see
-[Extending Totalsync for new devices](update.md) and the setup-specific examples linked
-from the [README](../README.md).
+[Extending TotalSync for new devices](extending.md) and the setup-specific examples under
+[Recording techniques](vsi.md).

@@ -68,7 +68,7 @@ assignments, since the firmware declares no names for them. Override them with
 ## Build configurations
 
 The source is run through a real C preprocessor, so only the branches the build
-actually compiles are considered. In `Documentation/examples/main_example.cpp`, pin 35 is
+actually compiles are considered. In `docs/examples/main_example.cpp`, pin 35 is
 `DEBUG_FRAME_CLOCK_OUT` under `SLM_DEBUG` and `TESTSHOCK` without it, and the
 generated sheet says whichever the configuration selects.
 
@@ -79,7 +79,7 @@ editing the firmware.
 ## Examples
 
 The firmware this repository ships is `Teensy41_Totalsync/Teensy41_Totalsync.ino`;
-`Documentation/examples/main_example.cpp` is a larger sketch kept alongside these docs
+`docs/examples/main_example.cpp` is a larger sketch kept alongside these docs
 because it exercises the build-configuration handling described above.
 
 ```bash
@@ -90,16 +90,16 @@ totalsync-pinsheet Teensy41_Totalsync/Teensy41_Totalsync.ino
 totalsync-pinsheet Teensy41_Totalsync/Teensy41_Totalsync.ino -o pinSheet.json
 
 # Generate the sheet for the production build instead of the bench build
-totalsync-pinsheet Documentation/examples/main_example.cpp -U SLM_DEBUG -o pinSheet.json
+totalsync-pinsheet docs/examples/main_example.cpp -U SLM_DEBUG -o pinSheet.json
 
 # Regenerate after a firmware change, keeping the hand written labels of an existing
 # sheet wherever the firmware has nothing better to offer. This is the one case where
 # writing back over a sheet you have edited is the intent rather than an accident.
 totalsync-pinsheet Teensy41_Totalsync/Teensy41_Totalsync.ino \
-    --merge Documentation/pinSheet_2026.json -o Documentation/pinSheet_2026.json
+    --merge docs/pinSheet_2026.json -o docs/pinSheet_2026.json
 
 # ...and feed the result straight to the decoder
-totalsync-decode /data/session01 -o /output/session01 -p Documentation/pinSheet_2026.json
+totalsync-decode /data/session01 -o /output/session01 -p docs/pinSheet_2026.json
 ```
 
 ## Python API

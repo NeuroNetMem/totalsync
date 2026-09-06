@@ -1,4 +1,4 @@
-## Teensy PIN USAGE
+# Pin usage
 
 DigitalInput | Used | For | DigitalOutput | Used | For | Analog | Used | For             
 ------------ | ------------- | ------------- | ------------- | ------------- | -------------  | -------------  | -------------  | -------------           

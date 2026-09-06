@@ -69,3 +69,14 @@ members = ["packages/*"]
 totalsync-webinterface = { workspace = true }
 totalsync-utils = { workspace = true }
 totalsync-2p = { workspace = true }
+
+# Documentation build. `uv sync --group docs`, or see .readthedocs.yaml for how the
+# published site is built.
+[dependency-groups]
+docs = [
+    "sphinx>=8.1",
+    "myst-parser>=4",
+    "furo",
+    "sphinx-copybutton",
+    "sphinx-design",
+]
