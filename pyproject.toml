@@ -1,22 +1,23 @@
-[build-system]
-requires = ["setuptools>=77"]
-build-backend = "setuptools.build_meta"
-
+# Workspace root, and the umbrella distribution that pulls the whole system in.
+#
+# `pip install totalsync` gets acquisition and analysis together; the three members are
+# also independently installable, so a machine that only decodes recordings can take
+# `totalsync-utils` on its own without pyserial, pyzmq or tkinter.
 [project]
 name = "totalsync"
-version = "3"
-description = "Synchronization system"
+version = "0.1.0"
+description = "Teensy-based synchronization system for multi-modal neuroscience recordings"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 authors = [
     { name = "Ronny Eichler" },
+    { name = "Francesco P. Battaglia" },
     { name = "Morgane Audrain", email = "morganeaudrain@gmail.com" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -25,36 +26,46 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-    "cobs",
-    "pyserial",
-    "numpy",
-    "pyzmq",
-    # On Linux/macOS `curses` is in the stdlib; only Windows needs the backport.
-    'windows-curses ; platform_system == "Windows"',
+    "totalsync-webinterface",
+    "totalsync-utils",
+    "totalsync-2p",
 ]
 
+# Forwarded so that `totalsync[extras]` and `uv sync --extra extras` keep working from
+# the workspace root; the optional dependencies themselves belong to the member that
+# imports them.
 [project.optional-dependencies]
-extras = [
-	    "pyglet",
-    	"sounddevice",
-]
-# NOTE: the GUI also needs `tkinter`, which is part of the stdlib but is *not*
-# pip-installable. It ships with the python.org and conda builds; with Homebrew
-# python you need `brew install python-tk`, on Debian/Ubuntu `apt install python3-tk`.
-# `picamera` is Raspberry Pi only and is imported behind a try/except in camera.py.
+extras = ["totalsync-webinterface[extras]"]
 
+# Re-declared here so that `uv tool install totalsync` puts all four commands on the
+# PATH in one isolated environment, which is what a recording or analysis machine wants.
+# A distribution that declares no executables of its own cannot be installed as a tool at
+# all -- uv removes it again and tells you to name a member instead.
+#
+# These must stay in step with the [project.scripts] of the members that own the modules;
+# `uv tool install` of this package is the check that they have.
 [project.scripts]
-totalsync = "webinterface.totalsync.TeensyCommander:cli_entry"
+totalsync = "totalsync_webinterface.teensy_commander:cli_entry"
+totalsync-decode = "totalsync_utils.cli:main"
+totalsync-pinsheet = "totalsync_utils.pinsheet:main"
+totalsync-2p = "totalsync_2p.cli:main"
 
-[tool.setuptools]
-# `webinterface` has no __init__.py, so it is an implicit namespace package.
-# It is listed explicitly because the web assets below live directly under it.
-packages = [
-    "webinterface",
-    "webinterface.totalsync",
-    "webinterface.totalsync.websocket_server",
-]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.setuptools.package-data]
-# WebInterface.py serves <package>/../web, so those files must be installed too.
-webinterface = ["web/**/*"]
+# This distribution is metadata only: it has no Python of its own, so hatchling has to be
+# told not to go looking for a package to put in the wheel.
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.uv.workspace]
+# A glob, so a new package under packages/ joins the workspace by existing.
+members = ["packages/*"]
+
+# Without these, the three names above (and totalsync-2p's dependency on totalsync-utils)
+# would be resolved from PyPI instead of from this tree.
+[tool.uv.sources]
+totalsync-webinterface = { workspace = true }
+totalsync-utils = { workspace = true }
+totalsync-2p = { workspace = true }

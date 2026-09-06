@@ -10,8 +10,10 @@ __pycache__/
 # ---------------------------------------------------------------------------
 # Packaging / build artifacts
 #
-# /build and /dist are anchored to the repo root on purpose: the vendored
-# webinterface/web/webgl-plot/dist is checked in and must not be ignored.
+# /build and /dist are anchored to the repo root on purpose. The vendored
+# packages/totalsync_webinterface/totalsync_webinterface/web/webgl-plot/dist/ is checked
+# in and is now the only thing left of that tree, so an unanchored `dist/` would erase
+# the plotting library the interface loads.
 # ---------------------------------------------------------------------------
 /build/
 /dist/
@@ -51,9 +53,9 @@ htmlcov/
 # ---------------------------------------------------------------------------
 # Recorded data and logs
 #
-# SerialDump writes <chosen dir>/<timestamp>.b64 (and .bin with -B); the
+# serial_dump writes <chosen dir>/<timestamp>.b64 (and .bin with -B); the
 # fallback when the directory chooser is cancelled is ./DataFile/.
-# CursesInterface refers to ./LogFile/.
+# curses_interface refers to ./LogFile/.
 # ---------------------------------------------------------------------------
 DataFile/
 LogFile/
@@ -69,7 +71,11 @@ LogFile/
 Teensy41_Totalsync/build/
 
 # ---------------------------------------------------------------------------
-# Node (only used to rebuild the vendored webgl-plot)
+# Node
+#
+# Not needed to build TotalSync: the vendored webgl-plot is trimmed to the prebuilt
+# dist/webglplot.esm.js bundle, so there is nothing here to compile. Kept in case
+# someone re-vendors it from upstream.
 # ---------------------------------------------------------------------------
 node_modules/
 npm-debug.log*

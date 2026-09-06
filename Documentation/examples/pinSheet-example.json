@@ -1,0 +1,301 @@
+{
+  "title": "Teensy-TotalSync pin information: main_example.cpp",
+  "updated": "20260905",
+  "pins": [
+    {
+      "name": "digital_input_0",
+      "unity": 0,
+      "teensy_pin": 0,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "digital_input_1",
+      "unity": 1,
+      "teensy_pin": 1,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "digital_input_2",
+      "unity": 2,
+      "teensy_pin": 2,
+      "used": true,
+      "for": "Wheel Enc Pina"
+    },
+    {
+      "name": "digital_input_3",
+      "unity": 3,
+      "teensy_pin": 3,
+      "used": true,
+      "for": "Wheel Enc Pinb"
+    },
+    {
+      "name": "digital_input_4",
+      "unity": 4,
+      "teensy_pin": 4,
+      "used": true,
+      "for": "Wheel Enc Sw"
+    },
+    {
+      "name": "digital_input_5",
+      "unity": 5,
+      "teensy_pin": 5,
+      "used": true,
+      "for": "Blick"
+    },
+    {
+      "name": "digital_input_6",
+      "unity": 6,
+      "teensy_pin": 6,
+      "used": true,
+      "for": "Scanner Frame Clock"
+    },
+    {
+      "name": "digital_input_7",
+      "unity": 7,
+      "teensy_pin": 7,
+      "used": true,
+      "for": "Speaker"
+    },
+    {
+      "name": "digital_input_8",
+      "unity": 8,
+      "teensy_pin": 8,
+      "used": true,
+      "for": "LED 1"
+    },
+    {
+      "name": "digital_input_9",
+      "unity": 9,
+      "teensy_pin": 9,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "digital_input_10",
+      "unity": 10,
+      "teensy_pin": 10,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "digital_input_11",
+      "unity": 11,
+      "teensy_pin": 11,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "digital_input_12",
+      "unity": 12,
+      "teensy_pin": 12,
+      "used": true,
+      "for": "Pin Camera Fstrobe"
+    },
+    {
+      "name": "digital_input_13",
+      "unity": 13,
+      "teensy_pin": 13,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "digital_input_14",
+      "unity": 14,
+      "teensy_pin": 14,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "digital_input_15",
+      "unity": 15,
+      "teensy_pin": 15,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "digital_output_0",
+      "unity": 16,
+      "teensy_pin": 24,
+      "used": true,
+      "for": "Valve"
+    },
+    {
+      "name": "digital_output_1",
+      "unity": 17,
+      "teensy_pin": 25,
+      "used": true,
+      "for": "Reward"
+    },
+    {
+      "name": "digital_output_2",
+      "unity": 18,
+      "teensy_pin": 26,
+      "used": true,
+      "for": "Lickdetect"
+    },
+    {
+      "name": "digital_output_3",
+      "unity": 19,
+      "teensy_pin": 27,
+      "used": true,
+      "for": "Tone 1"
+    },
+    {
+      "name": "digital_output_4",
+      "unity": 20,
+      "teensy_pin": 28,
+      "used": true,
+      "for": "Tone 2"
+    },
+    {
+      "name": "digital_output_5",
+      "unity": 21,
+      "teensy_pin": 29,
+      "used": true,
+      "for": "Trigger AATC"
+    },
+    {
+      "name": "digital_output_6",
+      "unity": 22,
+      "teensy_pin": 30,
+      "used": true,
+      "for": "Exper"
+    },
+    {
+      "name": "digital_output_7",
+      "unity": 23,
+      "teensy_pin": 31,
+      "used": true,
+      "for": "Shock"
+    },
+    {
+      "name": "digital_output_8",
+      "unity": 24,
+      "teensy_pin": 32,
+      "used": true,
+      "for": "SLM Debug Out"
+    },
+    {
+      "name": "digital_output_9",
+      "unity": 25,
+      "teensy_pin": 33,
+      "used": true,
+      "for": "SLM Stim Select"
+    },
+    {
+      "name": "digital_output_10",
+      "unity": 26,
+      "teensy_pin": 34,
+      "used": true,
+      "for": "SLM Stim Trigger"
+    },
+    {
+      "name": "digital_output_11",
+      "unity": 27,
+      "teensy_pin": 35,
+      "used": true,
+      "for": "Debug Frame Clock Out"
+    },
+    {
+      "name": "digital_output_12",
+      "unity": 28,
+      "teensy_pin": 36,
+      "used": true,
+      "for": "Ephys Trigger"
+    },
+    {
+      "name": "digital_output_13",
+      "unity": 29,
+      "teensy_pin": 37,
+      "used": true,
+      "for": "Ephys Sync"
+    },
+    {
+      "name": "digital_output_14",
+      "unity": 30,
+      "teensy_pin": 38,
+      "used": true,
+      "for": "Pin Sync LED"
+    },
+    {
+      "name": "digital_output_15",
+      "unity": 31,
+      "teensy_pin": 39,
+      "used": true,
+      "for": "Trigger C"
+    },
+    {
+      "name": "analog_input_0",
+      "unity": null,
+      "teensy_pin": 16,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "analog_input_1",
+      "unity": null,
+      "teensy_pin": 17,
+      "used": true,
+      "for": "Lick"
+    },
+    {
+      "name": "analog_input_2",
+      "unity": null,
+      "teensy_pin": 18,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "analog_input_3",
+      "unity": null,
+      "teensy_pin": 19,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "analog_input_4",
+      "unity": null,
+      "teensy_pin": 20,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "analog_input_5",
+      "unity": null,
+      "teensy_pin": 21,
+      "used": false,
+      "for": null
+    },
+    {
+      "name": "analog_input_6",
+      "unity": null,
+      "teensy_pin": 22,
+      "used": false,
+      "for": null
+    }
+  ],
+  "states": [
+    {
+      "idx": 0,
+      "name": "new_pos"
+    },
+    {
+      "idx": 1,
+      "name": "position_feel"
+    },
+    {
+      "idx": 2,
+      "name": "binary_lick"
+    },
+    {
+      "idx": 3,
+      "name": "lick"
+    },
+    {
+      "idx": 7,
+      "name": "last_packet_took"
+    }
+  ]
+}

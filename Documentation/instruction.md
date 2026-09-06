@@ -1,8 +1,18 @@
 # Installation
 
-TotalSync is a Python package (`totalsync`) with a command-line entry point of the same
-name. It is built and distributed with [uv](https://docs.astral.sh/uv/); the older
-`setup.py` / conda workflow is no longer used.
+TotalSync is distributed as four Python packages, built with
+[uv](https://docs.astral.sh/uv/); the older `setup.py` / conda workflow is no longer
+used. Installing `totalsync` gets all of them:
+
+| Distribution | Commands | What it is for |
+| --- | --- | --- |
+| `totalsync-webinterface` | `totalsync` | Recording: talk to the Teensy, serve the live browser interface |
+| `totalsync-utils` | `totalsync-decode`, `totalsync-pinsheet` | Turning recordings into analysis-ready data |
+| `totalsync-2p` | `totalsync-2p` | Aligning two-photon imaging with the telemetry |
+| `totalsync` | — | Umbrella that depends on the three above |
+
+Each is also installable on its own, which is worth doing on an analysis machine: only
+`totalsync-webinterface` needs the serial port, the GUI toolkit and ZeroMQ.
 
 It runs on Windows, macOS and Linux.
 
@@ -14,9 +24,10 @@ It runs on Windows, macOS and Linux.
 
 ## 1. Requirements
 
-* **Python 3.9 or newer.**
-* **Tkinter**, which the graphical dialogs need. It is part of the Python standard
-  library but is *not* installable with `pip`, so it has to come from your Python build:
+* **Python 3.11 or newer.**
+* **Tkinter**, which the graphical dialogs of the `totalsync` command need — the
+  analysis commands do not. It is part of the Python standard library but is *not*
+  installable with `pip`, so it has to come from your Python build:
   * Python installed by **uv**, from **python.org**, or from **conda** — already included.
   * **Homebrew** Python (macOS) — `brew install python-tk`
   * **Debian / Ubuntu** — `sudo apt install python3-tk`
@@ -60,14 +71,23 @@ This is the route for **using** TotalSync rather than developing it.
 
 ### Recommended: as a standalone tool
 
-`uv tool install` puts TotalSync in its own isolated environment and places the
-`totalsync` command on your `PATH`, so there is no environment to activate before use:
+`uv tool install` puts TotalSync in its own isolated environment and places its
+commands on your `PATH`, so there is no environment to activate before use:
 
 ```bash
 uv tool install totalsync
 ```
 
-That's it — `totalsync` is now available in any terminal.
+That's it — `totalsync`, `totalsync-decode`, `totalsync-pinsheet` and `totalsync-2p` are
+now available in any terminal.
+
+On a machine that only analyses recordings, install just the part you need and skip the
+serial, GUI and ZeroMQ dependencies:
+
+```bash
+uv tool install totalsync-utils      # totalsync-decode, totalsync-pinsheet
+uv tool install totalsync-2p         # totalsync-2p
+```
 
 ### Alternative: into a virtual environment
 
@@ -106,6 +126,15 @@ git clone <repository-url>
 cd TotalSync
 ```
 
+All four commands become available, not just `totalsync`:
+
+```bash
+uv run totalsync --help
+uv run totalsync-decode --help
+uv run totalsync-pinsheet --help
+uv run totalsync-2p --help
+```
+
 ### Step 2 — Create the environment and install
 
 ```bash
@@ -114,8 +143,15 @@ uv sync
 
 `uv sync` does everything in one step: it picks a suitable Python, creates a `.venv/` in
 the project folder, installs the dependencies at the exact versions recorded in
-`uv.lock`, and installs TotalSync itself in **editable** mode — so your edits to the
-source take effect immediately, with no reinstall.
+`uv.lock`, and installs all four TotalSync packages in **editable** mode — so your edits
+to the source take effect immediately, with no reinstall.
+
+The repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/):
+the packages under `packages/` share one `uv.lock` and one `.venv/`, and are resolved
+against each other from the source tree rather than from PyPI. There is nothing extra to
+run per package — `uv sync` at the top covers all of them.
+
+To work on a single package in isolation, `uv sync --package totalsync-utils`.
 
 ### Step 3 — Run it
 
@@ -183,6 +219,7 @@ serial port the Teensy is on. Useful command-line options:
 | `-C`, `--curses` | Show the text-mode status interface in the terminal. |
 | `-H`, `--http_port` | Port for the web interface (default 8000). |
 | `-w`, `--ws_port` | Port for the WebSocket server (default 5678). |
+| `--pinsheet` | A `pinSheet.json` saying what each pin is wired to. Channels with a `"for"` entry are labelled with it in the browser interface instead of their generated names; the rest keep those names. |
 | `-v`, `--verbose` | More logging detail. Logging is already at info level by default; `-v` switches it to debug. |
 
 Run `totalsync --help` for the full list.
@@ -203,6 +240,19 @@ To try things out without a Teensy attached:
 ```bash
 totalsync -D
 ```
+
+To see your own channel names in the interface rather than `digital_input_6`, pass a pin
+sheet. `Documentation/pinSheet_2026.json` is the one for the OFL rig; generate your own
+from the firmware with [`totalsync-pinsheet`](totalsync-pinsheet.md), then edit the
+`"for"` fields to match how the rig is actually wired:
+
+```bash
+totalsync --pinsheet Documentation/pinSheet_2026.json
+```
+
+The browser console reports how many labels it received (`Channel labels from pin sheet:
+29`), which is the quickest way to tell a missing `--pinsheet` from a sheet whose channel
+names do not match.
 
 For what to do once it is running, see the rest of the documentation linked from the
 [README](../README.md) — in particular [Quick Start](start.md) and the pin assignments in

@@ -1,0 +1,49 @@
+[project]
+name = "totalsync-webinterface"
+version = "0.1.0"
+description = "TotalSync acquisition: serial reader, live browser interface and recorder"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Ronny Eichler" },
+    { name = "Morgane Audrain", email = "morganeaudrain@gmail.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "cobs",
+    "pyserial",
+    "numpy",
+    "pyzmq",
+    # On Linux/macOS `curses` is in the stdlib; only Windows needs the backport.
+    'windows-curses ; platform_system == "Windows"',
+]
+
+[project.optional-dependencies]
+extras = [
+    "pyglet",
+    "sounddevice",
+]
+# NOTE: the GUI also needs `tkinter`, which is part of the stdlib but is *not*
+# pip-installable. It ships with the python.org and conda builds; with Homebrew
+# python you need `brew install python-tk`, on Debian/Ubuntu `apt install python3-tk`.
+# `picamera` is Raspberry Pi only and is imported behind a try/except in camera.py.
+
+[project.scripts]
+totalsync = "totalsync_webinterface.teensy_commander:cli_entry"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# The browser interface in totalsync_webinterface/web/ is inside the package, so
+# hatchling ships it as a matter of course -- there is no package-data list to fall out
+# of step with the files (see web_interface.WEB_DIRECTORY).
+[tool.hatch.build.targets.wheel]
+packages = ["totalsync_webinterface"]

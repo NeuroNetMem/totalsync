@@ -1,0 +1,35 @@
+[project]
+name = "totalsync-2p"
+version = "0.1.1"
+description = "TotalSync 2-photon data synchronization"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Francesco P. Battaglia" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "pynapple",
+    "tifffile",
+    "totalsync-utils",
+    "tqdm",
+]
+
+[project.scripts]
+totalsync-2p = "totalsync_2p.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["totalsync_2p"]
