@@ -241,12 +241,14 @@ static byte debug_frame_clock_tick = 0;  // ticks elapsed in the current phase
 #endif
 // SLM stimulation
 static bool slm_stim_armed = false;
+const int slm_stim_n_triggers = 3;
 const int slm_stim_duration = 10;
 const int slm_stim_waittime = 10;
 static bool slm_stim_active = false;           // trigger currently held high
 static unsigned long slm_stim_end_millis = 0;  // when to release the trigger
 static int slm_frame_clock_prev = HIGH;        // frame clock level on the last tick
 static byte slm_stim_selected = 0;
+static uint8_t slm_stim_pulses_left = 0;       // pulses still owed in this train
 
 // One-wire transmission of slm_stim_selected on SLM_STIM_SELECT. The line idles
 // LOW; a HIGH reset pulse of slmSelectResetTicks ms is followed by the 8 data
@@ -258,7 +260,7 @@ enum slmSelectPhase : uint8_t {
   slmSelReset,  // holding the reset pulse HIGH
   slmSelData,   // shifting out the 8 data bits
   slmSelWait,   // byte sent, holding the post-transmission pause
-  slmSelDone    // pause elapsed, waiting for the frame clock edge to fire
+  slmSelDone    // pause elapsed, firing one pulse per frame clock edge
 };
 const uint8_t slmSelectResetTicks = 10;  // reset pulse length, ms
 const uint8_t slmSelectDataBits = 8;
@@ -270,6 +272,16 @@ static byte slm_select_byte = 0;     // slm_stim_selected, latched at tx start
 // would wrap and never reach the comparison.
 static_assert(slm_stim_waittime >= 0 && slm_stim_waittime <= 255,
               "slm_stim_waittime must fit in slm_select_tick (uint8_t)");
+
+// slm_stim_pulses_left is pre-decremented on every pulse, so a zero-length
+// train would wrap and run for 256 frames instead of none.
+static_assert(slm_stim_n_triggers >= 1 && slm_stim_n_triggers <= 255,
+              "slm_stim_n_triggers must fit in slm_stim_pulses_left (uint8_t)");
+
+// Each pulse must be released before the frame clock edge that starts the next
+// one, otherwise the train degenerates into a single long pulse.
+static_assert(slm_stim_duration >= 1,
+              "slm_stim_duration must be at least one gather() tick");
 
 static volatile unsigned char counter = 0;
 static volatile long bufferedStates[nStates];
@@ -552,9 +564,12 @@ static void gather() {
 // Once armed, the selected stimulus index is clocked out on SLM_STIM_SELECT
 // (reset pulse + 8 bits, MSB first, one bit per tick). Once that byte is fully
 // on the wire and the line is back LOW, a settling pause of slm_stim_waittime
-// ms runs, giving the SLM time to load the pattern; only then does the next
-// falling edge of the scanner frame clock fire SLM_STIM_TRIGGER, which is held
-// for slm_stim_duration ms before disarming.
+// ms runs, giving the SLM time to load the pattern; only then does the train
+// start. It is slm_stim_n_triggers pulses on SLM_STIM_TRIGGER, one started on
+// each consecutive falling edge of the scanner frame clock and held for
+// slm_stim_duration ms - short enough to end well inside its own frame, so a
+// pulse never spans the edge that starts the next one. The stimulus disarms as
+// the last pulse of the train begins.
 //
 // The frame clock level is sampled every tick whether armed or not, so the
 // comparison is always against the immediately preceding tick rather than a
@@ -578,6 +593,7 @@ static void updateSlmStim() {
       digitalWriteFast(SLM_STIM_TRIGGER, LOW);
       slm_stim_armed = false;
       slm_stim_active = false;
+      slm_stim_pulses_left = 0;
       slm_select_phase = slmSelIdle;
       slm_select_tick = 0;
     }
@@ -647,20 +663,35 @@ static void updateSlmStim() {
         // Arming was withdrawn (e.g. by reset()) during the pause.
         slm_select_phase = slmSelIdle;
       } else if (++slm_select_tick >= slm_stim_waittime) {
+        // slmSelDone is only reachable from here, so loading the train counter
+        // on the transition guarantees every train starts from a full count.
+        slm_stim_pulses_left = slm_stim_n_triggers;
         slm_select_phase = slmSelDone;
       }
       break;
 
     case slmSelDone:
       if (!slm_stim_armed) {
-        // Arming was withdrawn (e.g. by reset()) while the byte was going out.
+        // Arming was withdrawn (e.g. by reset()) while the byte was going out
+        // or part way through the train; drop the pulses still owed.
+        slm_stim_pulses_left = 0;
         slm_select_phase = slmSelIdle;
       } else if (slm_frame_clock_prev == HIGH && slm_frame_clock == LOW) {
+        // One pulse per falling edge until the train is spent. The release
+        // below ends each pulse after slm_stim_duration ms, which the
+        // static_assert above plus a frame period longer than that keeps
+        // strictly inside the current frame.
         digitalWriteFast(SLM_STIM_TRIGGER, HIGH);
         slm_stim_end_millis = current_millis + slm_stim_duration;
         slm_stim_active = true;
-        slm_stim_armed = false;
-        slm_select_phase = slmSelIdle;
+        if (--slm_stim_pulses_left == 0) {
+          slm_stim_armed = false;
+          slm_select_phase = slmSelIdle;
+        }
+        // Otherwise stay in slmSelDone, armed, waiting for the next edge. Arming
+        // is held for the whole train, so SLM_DEBUG_OUT reads high across it and
+        // a re-arm while a train is running is absorbed rather than restarting
+        // the select transmission mid-train.
       }
       break;
   }
@@ -711,6 +742,7 @@ void reset() {
   slm_stim_armed = false;
   slm_stim_active = false;
   slm_stim_end_millis = 0;
+  slm_stim_pulses_left = 0;
   slm_select_phase = slmSelIdle;
   slm_select_tick = 0;
 #ifdef SLM_DEBUG
