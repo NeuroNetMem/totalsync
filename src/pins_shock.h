@@ -1,19 +1,8 @@
-// Pin map for the SLM / AATC setup on the Teensy 4.1.
-//
-// Every named pin used by main.cpp lives here, so switching to a different
-// experiment means swapping this one header rather than editing main.cpp.
-//
-// SLM_DEBUG must be defined (or left undefined) *before* this header is
-// included: pins 32 and 35 are shared between the debug outputs and
-// PRESHOCK / TESTSHOCK.
-//
-// Whether the SLM stimulation code actually runs is a runtime decision, taken
-// on the slm_experiment flag in main.cpp - the pin assignments below do not
-// depend on it.
 
-#ifndef PINS_SLM_H
-#define PINS_SLM_H
 
+#ifndef PINS_SHOCK_H
+#define PINS_SHOCK_H
+#include "Experiment.h"
 // Named pins in use on the Teensy
 #define WHEEL_ENC_PINA 2
 #define WHEEL_ENC_PINB 3
@@ -45,4 +34,23 @@
 #define LOOP_INDICATOR 40
 #define GATHER_INDICATOR 41
 
-#endif // PINS_SLM_H
+class OFL_ShockExperiment : public Experiment {
+
+private:
+    int iPacket = 0;
+    int exper = 0;
+    int preshock = 0;
+    void runExperiment();
+    void runPreShock();
+
+public:
+    ~OFL_ShockExperiment() override = default;
+    void setup() override; // gets called in setup()
+    void loopMicro() override; // gets called in loop()
+    void loopMilliPre() override; // gets called in gather() before serial port and pin updates
+    void loopMilliPost() override; // gets called in gather() after serial port and pin updates
+    void reset() override; // gets called in reset()
+
+};
+
+#endif // PINS_SHOCK_H

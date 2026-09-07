@@ -20,7 +20,15 @@
       "mcp__clion__read_file",
       "Bash(grep -n \"void setup\" src/main.cpp; sed -n '/^void setup/,/^}/p' src/main.cpp | head -60)",
       "Bash(~/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin/arm-none-eabi-nm -C .pio/build/teensy41/src/main.cpp.o)",
-      "Bash(xargs -I{} echo \"debug_frame symbols with SLM_DEBUG off: {}\")"
+      "Bash(xargs -I{} echo \"debug_frame symbols with SLM_DEBUG off: {}\")",
+      "Bash(zsh /tmp/pp.sh)",
+      "Bash(sed -e 's/-o [^ ]*\\\\.o/-E -o \\\\/tmp\\\\/ofl.i/' /tmp/cmd.txt)",
+      "Bash(zsh /tmp/pp2.sh)",
+      "Read(//tmp/**)",
+      "Read(//Users/fpbattaglia/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin/**)",
+      "Bash(sed -e 's|^arm-none-eabi-g++|__CMDSUB_OUTPUT__|' -e 's|-o [^ ]*\\\\.o|-E -o /tmp/ofl.i|' /tmp/cmd.txt)",
+      "Bash(zsh /tmp/pp3.sh)",
+      "Bash(rm -rf .pio/build/teensy41/src)"
     ]
   }
 }
