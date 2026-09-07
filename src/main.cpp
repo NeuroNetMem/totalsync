@@ -16,9 +16,9 @@
 #include <Encoder.h>
 #include <FastCRC.h>
 #include <PacketSerial.h>
-#include <math.h>
-#include <stdio.h>
-#include <string.h>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
 
 #include "PulsePin.h"
 
@@ -29,8 +29,16 @@
 // Serial port used for human readable diagnostics
 #define EXTSERIAL Serial1
 
-#define SLM_EXPERIMENT 1
+// Bench debugging of the SLM path: simulates the scanner frame clock and
+// mirrors the SLM state on scope pins. This one is still compile-time because
+// it changes what pins 32 and 35 carry, so it must be defined before
+// pins_slm.h. Whether the SLM experiment runs at all is decided at runtime by
+// the slm_experiment flag below.
 #define SLM_DEBUG 1
+
+// Named pins. Included here rather than with the other headers because it
+// reads SLM_DEBUG.
+#include "pins_slm.h"
 
 // Analog and digital channels scanned every gather tick
 const int pinsAnalogIn[] = {16, 17, 18, 19, 20, 21, 22};
@@ -52,54 +60,6 @@ const int nDigital = sizeof(pinsDigital) / sizeof(pinsDigital[0]);
 
 // Number of state variables shipped with every data packet
 const int nStates = 8;
-
-// Named pins in use on the Teensy
-#define WHEEL_ENC_PINA 2
-#define WHEEL_ENC_PINB 3
-#define WHEEL_ENC_SW 4
-#define BLICK 5
-#define SCANNER_FRAME_CLOCK 6
-#define SPEAKER 7
-#define LED_1 8
-#define PIN_CAMERA_FSTROBE 12
-#define LICK 17
-#define VALVE 24
-#define REWARD 25
-#define LICKDETECT 26
-#define TONE1 27
-#define TONE2 28
-#define TRIGGER_AATC 29
-#define EXPER 30
-#define SHOCK 31
-#ifdef SLM_DEBUG
-#define SLM_DEBUG_OUT 32
-#else
-#define PRESHOCK 32
-#endif
-#ifdef SLM_EXPERIMENT
-#define SLM_STIM_SELECT 33
-
-#define SLM_STIM_TRIGGER 34
-// Pin 35 is shared: with SLM_DEBUG on it carries the simulated frame clock, so
-// TESTSHOCK is undefined and its writes in runExperiment() / runPreShock() are
-// compiled out rather than allowed to fight the clock for the same pad.
-#ifdef SLM_DEBUG
-#define DEBUG_FRAME_CLOCK_OUT 35
-#else
-#define TESTSHOCK 35
-#endif
-#else
-#define LED_2 33
-#endif
-
-#define EPHYS_TRIGGER 36
-#define EPHYS_SYNC 37
-#define PIN_SYNC_LED 38
-#define TRIGGER_C 39
-
-// Pins used to scope the communication / acquisition timing
-#define LOOP_INDICATOR 40
-#define GATHER_INDICATOR 41
 
 // On-board LED
 const int ledPin = LED_BUILTIN;
@@ -260,8 +220,11 @@ static unsigned long triggertime = 1000;
 static unsigned long tonelength = 0;
 static unsigned long rewardtime = 0;
 
-
-#ifdef SLM_EXPERIMENT
+// Runtime switch for the SLM experiment, replacing the former SLM_EXPERIMENT
+// compile-time flag so it can be toggled between runs without a reflash. Read
+// from gather() (timer ISR) and meant to be written from loop() context, hence
+// volatile.
+static volatile bool slm_experiment = true;
 
 #ifdef SLM_DEBUG
 // Simulated scanner frame clock, so the SLM path can be exercised on the bench
@@ -308,8 +271,6 @@ static byte slm_select_byte = 0;     // slm_stim_selected, latched at tx start
 static_assert(slm_stim_waittime >= 0 && slm_stim_waittime <= 255,
               "slm_stim_waittime must fit in slm_select_tick (uint8_t)");
 
-#endif
-
 static volatile unsigned char counter = 0;
 static volatile long bufferedStates[nStates];
 
@@ -332,24 +293,26 @@ static dataPacket State;
 
 // Acquisition
 static void gather();
-void applyState(dataPacket* packet);
-void reset();
+static void updateSlmStim();
+static void applyState(dataPacket* packet);
+static void reset();
 
 // Serial communication
-void onPacketReceived(const uint8_t* buffer, size_t size);
-void processInstruction(const uint8_t* buf, size_t buf_sz);
-void dumpBuffer(const uint8_t* buffer, size_t size);
-void debugPrint(const char* msg);
+static void onPacketReceived(const uint8_t* buffer, size_t size);
+static void processInstruction(const uint8_t* buf, size_t buf_sz);
+static void dumpBuffer(const uint8_t* buffer, size_t size);
+static void debugPrint(const char* msg);
 
 // Pulse pins and camera / ephys synchronization
-PulsePin* getPulsePinById(byte id);
+static PulsePin* getPulsePinById(byte id);
 static void syncBlink();
-void ephysrand();
+
+static void ephysrand();
 
 // Experiment state machines
-void runExperiment();
-void runPreShock();
-void AATC();
+static void runExperiment();
+static void runPreShock();
+static void AATC();
 
 // ---------------------------------------------------------------------------
 // 6. Arduino entry points
@@ -434,7 +397,7 @@ void loop() {
   }
 
   if (packetReady) {
-    State.crc16 = CRC16.kermit((uint8_t*)&State, sizeof(State));
+    State.crc16 = CRC16.kermit(reinterpret_cast<uint8_t *>(&State), sizeof(State));
 
     // Only write to a port that provably has room for a whole packet.
     // usb_serialN_write() spins for up to TX_TIMEOUT_MSEC (120 ms) when the host
@@ -456,10 +419,10 @@ void loop() {
     // every packet on a perfectly healthy port. Unplugged is handled anyway:
     // usb_serialN_write() returns immediately when !usb_configuration.
     if (SerialUSB1.availableForWrite() >= packetWireSize) {
-      packetSerialA.send((byte*)&State, sizeof(State));
+      packetSerialA.send(reinterpret_cast<byte *>(&State), sizeof(State));
     }
     if (SerialUSB2.availableForWrite() >= packetWireSize) {
-      packetSerialB.send((byte*)&State, sizeof(State));
+      packetSerialB.send(reinterpret_cast<byte *>(&State), sizeof(State));
     }
 
     // Apply current state vector
@@ -493,110 +456,8 @@ static void gather() {
   digitalWriteFast(GATHER_INDICATOR, HIGH); // toggle pin to indicate gather start
   dataPacket packet;
 
-#ifdef SLM_EXPERIMENT
-  // SLM stimulation. Once armed, the selected stimulus index is clocked out on
-  // SLM_STIM_SELECT (reset pulse + 8 bits, MSB first, one bit per tick). Once
-  // that byte is fully on the wire and the line is back LOW, a settling pause of
-  // slm_stim_waittime ms runs, giving the SLM time to load the pattern; only
-  // then does the next falling edge of the scanner frame clock fire
-  // SLM_STIM_TRIGGER, which is held for slm_stim_duration ms before disarming.
-  //
-  // The frame clock level is sampled every tick whether armed or not, so the
-  // comparison is always against the immediately preceding tick rather than a
-  // stale level from whenever arming last happened. This block runs before the
-  // experiment state machines that arm it, so the edge that fires a stimulus is
-  // always one sampled strictly after the arming tick.
-  //
-  // The phases are exclusive per tick: a tick that advances the transmission or
-  // the pause never also fires the trigger, so the falling edge acted on is
-  // always at least slm_stim_waittime ms - in practice one tick more - after
-  // SLM_STIM_SELECT returned LOW.
-#ifdef SLM_DEBUG
-  // Drive the simulated frame clock in place of the pin. The phase durations are
-  // counted in gather() ticks, so they are milliseconds only while gatherTimer
-  // stays at a 1000 us interval - the same assumption the select transmission
-  // above makes. The level is toggled before it is sampled, so the tick that
-  // flips the clock is also the tick that sees the edge.
-  if (++debug_frame_clock_tick >= (debug_frame_clock
-                                       ? debug_frame_clock_high_millis
-                                       : debug_frame_clock_low_millis)) {
-    debug_frame_clock_tick = 0;
-    debug_frame_clock = !debug_frame_clock;
-  }
-  digitalWriteFast(DEBUG_FRAME_CLOCK_OUT, debug_frame_clock);
-  const int slm_frame_clock = debug_frame_clock ? HIGH : LOW;
-  // write the status of slm_stim_armed to SLM_DEBUG_OUT
-  if (slm_stim_armed)
-    digitalWriteFast(SLM_DEBUG_OUT, HIGH);
-  else
-    digitalWriteFast(SLM_DEBUG_OUT, LOW);
-
-#else
-  const int slm_frame_clock = digitalReadFast(SCANNER_FRAME_CLOCK);
-#endif
-  switch (slm_select_phase) {
-    case slmSelIdle:
-      if (slm_stim_armed) {
-        // Latch the index so a later write to slm_stim_selected cannot corrupt
-        // the byte mid-transmission.
-        slm_select_byte = slm_stim_selected;
-        slm_select_tick = 0;
-        digitalWriteFast(SLM_STIM_SELECT, HIGH);
-        slm_select_phase = slmSelReset;
-      }
-      break;
-
-    case slmSelReset:
-      if (++slm_select_tick >= slmSelectResetTicks) {
-        slm_select_tick = 0;
-        digitalWriteFast(SLM_STIM_SELECT,
-                         (slm_select_byte >> (slmSelectDataBits - 1)) & 0x1);
-        slm_select_phase = slmSelData;
-      }
-      break;
-
-    case slmSelData:
-      if (++slm_select_tick >= slmSelectDataBits) {
-        // Last bit has been held for its full tick: return the line to idle.
-        digitalWriteFast(SLM_STIM_SELECT, LOW);
-        slm_select_tick = 0;
-        slm_select_phase = slmSelWait;
-      } else {
-        digitalWriteFast(
-            SLM_STIM_SELECT,
-            (slm_select_byte >> (slmSelectDataBits - 1 - slm_select_tick)) & 0x1);
-      }
-      break;
-
-    case slmSelWait:
-      if (!slm_stim_armed) {
-        // Arming was withdrawn (e.g. by reset()) during the pause.
-        slm_select_phase = slmSelIdle;
-      } else if (++slm_select_tick >= slm_stim_waittime) {
-        slm_select_phase = slmSelDone;
-      }
-      break;
-
-    case slmSelDone:
-      if (!slm_stim_armed) {
-        // Arming was withdrawn (e.g. by reset()) while the byte was going out.
-        slm_select_phase = slmSelIdle;
-      } else if (slm_frame_clock_prev == HIGH && slm_frame_clock == LOW) {
-        digitalWriteFast(SLM_STIM_TRIGGER, HIGH);
-        slm_stim_end_millis = current_millis + slm_stim_duration;
-        slm_stim_active = true;
-        slm_stim_armed = false;
-        slm_select_phase = slmSelIdle;
-      }
-      break;
-  }
-  slm_frame_clock_prev = slm_frame_clock;
-
-  if (slm_stim_active && current_millis >= slm_stim_end_millis) {
-    digitalWriteFast(SLM_STIM_TRIGGER, LOW);
-    slm_stim_active = false;
-  }
-#endif
+  // Runs before the experiment state machines that arm it, see updateSlmStim()
+  updateSlmStim();
 
   if (ephys == 1) {
     ephysrand();
@@ -685,6 +546,132 @@ static void gather() {
   digitalWriteFast(GATHER_INDICATOR, LOW); // toggle pin to indicate gather end
 }
 
+// One tick of the SLM stimulation state machine, called from gather() every
+// millisecond and gated on the slm_experiment flag.
+//
+// Once armed, the selected stimulus index is clocked out on SLM_STIM_SELECT
+// (reset pulse + 8 bits, MSB first, one bit per tick). Once that byte is fully
+// on the wire and the line is back LOW, a settling pause of slm_stim_waittime
+// ms runs, giving the SLM time to load the pattern; only then does the next
+// falling edge of the scanner frame clock fire SLM_STIM_TRIGGER, which is held
+// for slm_stim_duration ms before disarming.
+//
+// The frame clock level is sampled every tick whether armed or not, so the
+// comparison is always against the immediately preceding tick rather than a
+// stale level from whenever arming last happened. gather() calls this before
+// the experiment state machines that arm it, so the edge that fires a stimulus
+// is always one sampled strictly after the arming tick.
+//
+// The phases are exclusive per tick: a tick that advances the transmission or
+// the pause never also fires the trigger, so the falling edge acted on is
+// always at least slm_stim_waittime ms - in practice one tick more - after
+// SLM_STIM_SELECT returned LOW.
+static void updateSlmStim() {
+  if (!slm_experiment) {
+    // Toggled off, possibly mid-stimulus: release both lines and drop anything
+    // pending or in flight, so nothing is left asserted. The guard is false on
+    // every following tick, so the pins are not driven while idle. Seeding the
+    // edge detector LOW means the first tick after a re-enable cannot see a
+    // phantom falling edge.
+    if (slm_stim_armed || slm_stim_active || slm_select_phase != slmSelIdle) {
+      digitalWriteFast(SLM_STIM_SELECT, LOW);
+      digitalWriteFast(SLM_STIM_TRIGGER, LOW);
+      slm_stim_armed = false;
+      slm_stim_active = false;
+      slm_select_phase = slmSelIdle;
+      slm_select_tick = 0;
+    }
+    slm_frame_clock_prev = LOW;
+    return;
+  }
+
+#ifdef SLM_DEBUG
+  // Drive the simulated frame clock in place of the pin. The phase durations are
+  // counted in gather() ticks, so they are milliseconds only while gatherTimer
+  // stays at a 1000 us interval - the same assumption the select transmission
+  // below makes. The level is toggled before it is sampled, so the tick that
+  // flips the clock is also the tick that sees the edge.
+  if (++debug_frame_clock_tick >= (debug_frame_clock
+                                       ? debug_frame_clock_high_millis
+                                       : debug_frame_clock_low_millis)) {
+    debug_frame_clock_tick = 0;
+    debug_frame_clock = !debug_frame_clock;
+  }
+  digitalWriteFast(DEBUG_FRAME_CLOCK_OUT, debug_frame_clock);
+  const int slm_frame_clock = debug_frame_clock ? HIGH : LOW;
+  // write the status of slm_stim_armed to SLM_DEBUG_OUT
+  if (slm_stim_armed)
+    digitalWriteFast(SLM_DEBUG_OUT, HIGH);
+  else
+    digitalWriteFast(SLM_DEBUG_OUT, LOW);
+
+#else
+  const int slm_frame_clock = digitalReadFast(SCANNER_FRAME_CLOCK);
+#endif
+  switch (slm_select_phase) {
+    case slmSelIdle:
+      if (slm_stim_armed) {
+        // Latch the index so a later write to slm_stim_selected cannot corrupt
+        // the byte mid-transmission.
+        slm_select_byte = slm_stim_selected;
+        slm_select_tick = 0;
+        digitalWriteFast(SLM_STIM_SELECT, HIGH);
+        slm_select_phase = slmSelReset;
+      }
+      break;
+
+    case slmSelReset:
+      if (++slm_select_tick >= slmSelectResetTicks) {
+        slm_select_tick = 0;
+        digitalWriteFast(SLM_STIM_SELECT,
+                         (slm_select_byte >> (slmSelectDataBits - 1)) & 0x1);
+        slm_select_phase = slmSelData;
+      }
+      break;
+
+    case slmSelData:
+      if (++slm_select_tick >= slmSelectDataBits) {
+        // Last bit has been held for its full tick: return the line to idle.
+        digitalWriteFast(SLM_STIM_SELECT, LOW);
+        slm_select_tick = 0;
+        slm_select_phase = slmSelWait;
+      } else {
+        digitalWriteFast(
+            SLM_STIM_SELECT,
+            (slm_select_byte >> (slmSelectDataBits - 1 - slm_select_tick)) & 0x1);
+      }
+      break;
+
+    case slmSelWait:
+      if (!slm_stim_armed) {
+        // Arming was withdrawn (e.g. by reset()) during the pause.
+        slm_select_phase = slmSelIdle;
+      } else if (++slm_select_tick >= slm_stim_waittime) {
+        slm_select_phase = slmSelDone;
+      }
+      break;
+
+    case slmSelDone:
+      if (!slm_stim_armed) {
+        // Arming was withdrawn (e.g. by reset()) while the byte was going out.
+        slm_select_phase = slmSelIdle;
+      } else if (slm_frame_clock_prev == HIGH && slm_frame_clock == LOW) {
+        digitalWriteFast(SLM_STIM_TRIGGER, HIGH);
+        slm_stim_end_millis = current_millis + slm_stim_duration;
+        slm_stim_active = true;
+        slm_stim_armed = false;
+        slm_select_phase = slmSelIdle;
+      }
+      break;
+  }
+  slm_frame_clock_prev = slm_frame_clock;
+
+  if (slm_stim_active && current_millis >= slm_stim_end_millis) {
+    digitalWriteFast(SLM_STIM_TRIGGER, LOW);
+    slm_stim_active = false;
+  }
+}
+
 // State machine
 void applyState(dataPacket* packet) {
   (void)packet; // apply finite state machine updates here
@@ -713,8 +700,8 @@ void reset() {
     pulsePins[i]->restart();
   }
 
-#ifdef SLM_EXPERIMENT
-  // Drop any pending or in-flight SLM stimulus. Required because current_millis
+  // Drop any pending or in-flight SLM stimulus, whatever slm_experiment says -
+  // there is nothing to preserve either way. Required because current_millis
   // is zeroed above: a live slm_stim_end_millis would otherwise sit ~49 days in
   // the future and hold the trigger high. Seed the edge detector from the pin so
   // the first tick after a reset cannot see a phantom falling edge. Abandoning a
@@ -736,7 +723,6 @@ void reset() {
   slm_frame_clock_prev = LOW;
 #else
   slm_frame_clock_prev = digitalReadFast(SCANNER_FRAME_CLOCK);
-#endif
 #endif
 
   interrupts();
@@ -1042,16 +1028,16 @@ void AATC() {
   }
   if ((current_millis >= triggertime) && (Tone == 1) && (n_sound1 < 3)) {
     // Tone CS+
-#ifdef SLM_EXPERIMENT
-    slm_stim_armed = true;
+    if (slm_experiment) {
+      slm_stim_armed = true;
 #ifdef SLM_DEBUG
-    slm_stim_selected++;
+      slm_stim_selected++;
 #endif
-#else
-    analogWriteFrequency(SPEAKER, 9000);
-    analogWrite(SPEAKER, 127);
-    digitalWriteFast(TONE1, HIGH);
-#endif
+    } else {
+      analogWriteFrequency(SPEAKER, 9000);
+      analogWrite(SPEAKER, 127);
+      digitalWriteFast(TONE1, HIGH);
+    }
     rewardtime = triggertime + 3000;
     tonelength = triggertime + 2000;
 
@@ -1067,13 +1053,11 @@ void AATC() {
 
 
 
-#ifndef SLM_EXPERIMENT
-    if (current_millis == tonelength) {
+    if (!slm_experiment && current_millis == tonelength) {
       digitalWriteFast(TONE1, LOW);
       digitalWriteFast(TONE2, LOW);
       analogWrite(SPEAKER, 0);
     }
-#endif
     if (current_millis == rewardtime) {
       digitalWriteFast(REWARD, HIGH);
     }
@@ -1083,15 +1067,15 @@ void AATC() {
   }
   if ((current_millis >= triggertime) && (Tone == 0) && (n_sound2 < 3)) {
     // Tone CS-
-#ifdef SLM_EXPERIMENT
-    slm_stim_armed = true;
+    if (slm_experiment) {
+      slm_stim_armed = true;
 #ifdef SLM_DEBUG
-    slm_stim_selected++;
+      slm_stim_selected++;
 #endif
-#else
-    tone(SPEAKER, 3000, 2000);
-    digitalWriteFast(TONE2, HIGH);
-#endif
+    } else {
+      tone(SPEAKER, 3000, 2000);
+      digitalWriteFast(TONE2, HIGH);
+    }
     tonelength = triggertime + 2000;
 
 #ifdef SLM_DEBUG
@@ -1111,13 +1095,11 @@ void AATC() {
     Tone = 1;
   }
 
-#ifdef SLM_EXPERIMENT
-
+  if (slm_experiment) {
 #ifdef SLM_DEBUG
-  if (slm_stim_selected >= 128) slm_stim_selected = 0;
+    if (slm_stim_selected >= 128) slm_stim_selected = 0;
 #else
-  slm_stim_selected = Tone;
+    slm_stim_selected = Tone;
 #endif
-
-#endif
+  }
 }
