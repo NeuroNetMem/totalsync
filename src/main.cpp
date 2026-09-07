@@ -61,8 +61,8 @@ const int nDigital = sizeof(pinsDigital) / sizeof(pinsDigital[0]);
 // Number of state variables shipped with every data packet
 const int nStates = 8;
 
-// On-board LED
-const int ledPin = LED_BUILTIN;
+// // On-board LED
+// const int ledPin = LED_BUILTIN;
 
 // Pulse pins for the pupil camera
 const int pinsPulsePins[] = {30, 31};

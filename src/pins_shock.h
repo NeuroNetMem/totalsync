@@ -33,21 +33,8 @@
 #define TRIGGER_AATC 29
 #define EXPER 30
 #define SHOCK 31
-
-// Pin 32 is shared: with SLM_DEBUG on it reports slm_stim_armed for scoping.
-#ifdef SLM_DEBUG
-#define SLM_DEBUG_OUT 32
-#endif
-
-#define SLM_STIM_SELECT 33
-#define SLM_STIM_TRIGGER 34
-
-// Pin 35 is shared: with SLM_DEBUG on it carries the simulated frame clock, so
-// TESTSHOCK is undefined and its writes in runExperiment() / runPreShock() are
-// compiled out rather than allowed to fight the clock for the same pad.
-#ifdef SLM_DEBUG
-#define DEBUG_FRAME_CLOCK_OUT 35
-#endif
+#define PRESHOCK 32
+#define TESTSHOCK 35
 
 #define EPHYS_TRIGGER 36
 #define EPHYS_SYNC 37
