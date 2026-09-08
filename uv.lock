@@ -1779,7 +1779,7 @@ wheels = [
 
 [[package]]
 name = "totalsync"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "totalsync-2p" },
@@ -1822,7 +1822,7 @@ docs = [
 
 [[package]]
 name = "totalsync-2p"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "packages/totalsync_2p" }
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -1847,7 +1847,7 @@ requires-dist = [
 
 [[package]]
 name = "totalsync-utils"
-version = "0.1.2"
+version = "0.1.3"
 source = { editable = "packages/totalsync_utils" }
 dependencies = [
     { name = "cobs" },
@@ -1872,7 +1872,7 @@ requires-dist = [
 
 [[package]]
 name = "totalsync-webinterface"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/totalsync_webinterface" }
 dependencies = [
     { name = "cobs" },
