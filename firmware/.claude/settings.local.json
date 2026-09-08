@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 400 pio run -e teensy41)",
+      "Bash(pio run *)",
+      "mcp__clion__get_compiler_info",
+      "Bash(grep -rn \"USB_SERIAL\\\\|USB_TRIPLE\\\\|USB_DUAL\" ~/.platformio/platforms/teensy/builder/ 2>/dev/null | head -20)",
+      "Bash(touch src/main.cpp && pio run -e teensy41 -v 2>&1 | grep -m1 \"src/main.cpp.o\" | tr ' ' '\\\\n' | grep -E \"^-D\\(USB|LAYOUT\\)\" )",
+      "Bash(grep -rn -B4 \"SerialUSB1;\\\\|SerialUSB2;\" ~/.platformio/packages/framework-arduinoteensy/cores/teensy4/*.h | head -30)",
+      "mcp__clion__get_file_problems",
+      "Bash(grep -n \"write_buffer_free\\\\|usb_configuration\\\\|tx_noautoflush\\\\|transmit_previous_timeout\\\\|TX_TIMEOUT\" /Users/fpbattaglia/.platformio/packages/framework-arduinoteensy/cores/teensy4/usb_serial2.c | head -60)",
+      "Read(//Users/fpbattaglia/.platformio/packages/framework-arduinoteensy/cores/teensy4/**)",
+      "mcp__clion__get_run_configurations",
+      "Bash(python3 -)",
+      "Bash(grep -n \"teensy_loader\\\\|teensy_reboot\\\\|teensy_post_compile\\\\|UPLOAD\\\\|upload\" /Users/fpbattaglia/.platformio/platforms/teensy/builder/main.py | head -40)",
+      "Bash(python3 -c ' *)",
+      "Read(//Users/fpbattaglia/.platformio/packages/tool-teensy/**)",
+      "Bash(find /Users/fpbattaglia/Applications/CLion.app -iname \"*platformio*\" -o -iname \"*embedded*\" 2>/dev/null | head -20)",
+      "mcp__clion__get_all_open_file_paths",
+      "mcp__clion__read_file",
+      "Bash(grep -n \"void setup\" src/main.cpp; sed -n '/^void setup/,/^}/p' src/main.cpp | head -60)",
+      "Bash(~/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin/arm-none-eabi-nm -C .pio/build/teensy41/src/main.cpp.o)",
+      "Bash(xargs -I{} echo \"debug_frame symbols with SLM_DEBUG off: {}\")",
+      "Bash(zsh /tmp/pp.sh)",
+      "Bash(sed -e 's/-o [^ ]*\\\\.o/-E -o \\\\/tmp\\\\/ofl.i/' /tmp/cmd.txt)",
+      "Bash(zsh /tmp/pp2.sh)",
+      "Read(//tmp/**)",
+      "Read(//Users/fpbattaglia/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin/**)",
+      "Bash(sed -e 's|^arm-none-eabi-g++|__CMDSUB_OUTPUT__|' -e 's|-o [^ ]*\\\\.o|-E -o /tmp/ofl.i|' /tmp/cmd.txt)",
+      "Bash(zsh /tmp/pp3.sh)",
+      "Bash(rm -rf .pio/build/teensy41/src)"
+    ]
+  }
+}
