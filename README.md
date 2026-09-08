@@ -1,9 +1,16 @@
 # TotalSync
 
+[![PyPI](https://img.shields.io/pypi/v/totalsync.svg)](https://pypi.org/project/totalsync/)
+[![Python versions](https://img.shields.io/pypi/pyversions/totalsync.svg)](https://pypi.org/project/totalsync/)
 [![Documentation](https://readthedocs.org/projects/totalsync/badge/?version=latest)](https://totalsync.readthedocs.io/en/latest/)
+[![License: GPL v3+](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 
 TotalSync is a low-cost, open-source teensy-based synchronization system for multiple
 recording techniques.
+
+```bash
+uv tool install totalsync
+```
 
 **[Read the documentation →](https://totalsync.readthedocs.io)**
 
@@ -36,7 +43,7 @@ recording techniques.
  * **[Voltage sensitive imaging](docs/vsi.md)**
 
 Chapters for two-photon microscopy, electrophysiology / Neuropixel and virtual reality
-are planned; the placeholder files under `docs/` are not published yet.
+are planned; their placeholder files under `docs/` are not part of the site yet.
 
 ## Repository layout
 

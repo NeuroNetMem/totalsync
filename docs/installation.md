@@ -66,9 +66,6 @@ alongside it.
 
 This is the route for **using** TotalSync rather than developing it.
 
-> TotalSync is not published on PyPI yet. Until it is, use
-> [Installing from source](#installing-from-source).
-
 ### Recommended: as a standalone tool
 
 `uv tool install` puts TotalSync in its own isolated environment and places its
@@ -117,7 +114,8 @@ pip install totalsync
 
 ## Installing from source
 
-Use this if you want to modify TotalSync, or before it is published to PyPI.
+Use this if you want to modify TotalSync. To just use it, install
+[from PyPI](#installing-from-pypi) instead.
 
 ### Step 1 — Get the code
 
@@ -229,7 +227,9 @@ Once it is running, see [Quick Start](quickstart.md) and the pin assignments in
 
 ## Updating
 
-**Installed as a tool:**
+**Installed as a tool:** name whichever package you installed — `totalsync` covers all
+four commands, `totalsync-utils` and `totalsync-2p` upgrade separately if you installed
+them on their own.
 ```bash
 uv tool upgrade totalsync
 ```
@@ -250,7 +250,13 @@ uv sync
 
 ```bash
 uv tool uninstall totalsync      # if installed as a tool
-uv pip uninstall totalsync       # if installed in a virtual environment
+```
+
+A tool install is self-contained, so that removes everything. In a virtual environment,
+uninstalling the umbrella leaves the three packages it depended on behind:
+
+```bash
+uv pip uninstall totalsync totalsync-webinterface totalsync-utils totalsync-2p
 ```
 
 A source checkout is removed by deleting the folder, including its `.venv/`.
@@ -259,39 +265,102 @@ A source checkout is removed by deleting the folder, including its `.venv/`.
 
 ## For maintainers: building and publishing
 
-Package metadata lives in `pyproject.toml`; there is no `setup.py` to maintain. Build
-the distributions with:
+Package metadata lives in the `pyproject.toml` files; there is no `setup.py` to maintain.
+The repository publishes **four distributions**, so most of the commands below need to be
+told to act on all of them rather than just the one at the root.
+
+### Versions
+
+Each distribution carries its own `version`, and PyPI refuses to accept a version twice —
+even if the upload is otherwise identical, and even after a release is deleted. So bump
+the `version` of every package you actually changed before building:
+
+| Distribution | Where |
+| --- | --- |
+| `totalsync` | `pyproject.toml` |
+| `totalsync-webinterface` | `packages/totalsync_webinterface/pyproject.toml` |
+| `totalsync-utils` | `packages/totalsync_utils/pyproject.toml` |
+| `totalsync-2p` | `packages/totalsync_2p/pyproject.toml` |
+
+The umbrella `totalsync` is the one to watch: it has no code of its own, so it is easy to
+forget, but it is the package most people install.
+
+### Build
 
 ```bash
-uv build
+uv build --all-packages
 ```
 
-This writes a wheel and a source archive to `dist/`. Check the wheel actually contains
-the web interface assets, since they live outside the Python package and are easy to
-lose:
+`--all-packages` is not optional. Plain `uv build` at the root builds only the umbrella
+distribution and silently leaves the other three at whatever version was in `dist/`
+before. The result is eight files in `dist/` — a wheel and a source archive each.
+
+Then check the one thing that can go missing without the build failing. The browser
+interface is the only non-Python payload, and it ships inside
+`totalsync-webinterface`, not the umbrella:
 
 ```bash
-uv run python -m zipfile -l dist/totalsync-*.whl | grep web/
+uv run python -m zipfile -l dist/totalsync_webinterface-*.whl | grep web/
 ```
 
-Publish to PyPI with:
+Fourteen files should be listed. Nothing here is generated at build time, so if this
+comes up empty the wheel would install a blank interface.
+
+### Test against TestPyPI first
+
+TestPyPI is a separate registry with its own account and its own API tokens; register at
+<https://test.pypi.org> before the first upload. Nothing you do there affects PyPI.
+
+```bash
+uv publish --publish-url https://test.pypi.org/legacy/ --dry-run   # look before you leap
+uv publish --publish-url https://test.pypi.org/legacy/
+```
+
+Installing from TestPyPI to check the result needs one extra flag, because none of the
+dependencies (numpy, scipy, pandas, pynapple, tifffile, …) are published there:
+
+```bash
+uv pip install \
+    --index-url https://test.pypi.org/simple/ \
+    --extra-index-url https://pypi.org/simple/ \
+    --index-strategy unsafe-best-match \
+    totalsync
+```
+
+`--index-strategy unsafe-best-match` matters: uv otherwise stops at the first index that
+carries a name at all, and TestPyPI holds stale placeholder uploads of common package
+names that it would then prefer over the real ones.
+
+### Publish
 
 ```bash
 uv publish
 ```
 
-`uv publish` will ask for an API token, or read one from `UV_PUBLISH_TOKEN`. Test the
-whole thing against TestPyPI first:
+`uv publish` reads a token from `UV_PUBLISH_TOKEN`, or asks for one. Two flags are worth
+knowing:
 
-```bash
-uv publish --publish-url https://test.pypi.org/legacy/
-```
+* `--dry-run` does everything except the upload.
+* `--check-url https://pypi.org/simple/` skips files that are already on the index instead
+  of failing the whole batch on one duplicate — useful when only some of the four
+  distributions changed.
 
-Bump `version` in `pyproject.toml` before each release; PyPI refuses to accept the same
-version twice.
+All eight files upload in one call and the order does not matter. Installation order does:
+`totalsync-2p` depends on `totalsync-utils`, and the umbrella depends on all three, so
+publish them together rather than leaving a release half-done.
 
-When you change dependencies, commit the updated `uv.lock` along with `pyproject.toml`
-— that lock file is what guarantees every machine in the lab gets identical versions.
+:::{tip}
+For releases from CI, [Trusted Publishing](https://docs.pypi.org/trusted-publishers/)
+(`uv publish --trusted-publishing automatic`) exchanges a short-lived OIDC token for
+upload rights, so no long-lived API token has to be stored anywhere. It is registered per
+project on PyPI, so that is four registrations here — in exchange for four fewer tokens.
+:::
+
+### The lock file
+
+When you change dependencies, commit the updated `uv.lock` along with the `pyproject.toml`
+— that lock file is what guarantees every machine in the lab, and the ReadTheDocs builder,
+gets identical versions.
 
 ---
 
