@@ -1,6 +1,6 @@
 [project]
 name = "totalsync-2p"
-version = "0.1.1"
+version = "0.1.2"
 description = "TotalSync 2-photon data synchronization"
 readme = "README.md"
 requires-python = ">=3.11"
