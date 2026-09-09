@@ -2,22 +2,23 @@ import base64
 from pathlib import Path
 from datetime import datetime
 import logging
-from tkinter import filedialog
-
-
-def browse_button():
-    # Allow the user to select a directory to write the dump files into.
-    filename = filedialog.askdirectory()
-    if filename == "":
-        filename = "DataFile/"
-
-    return filename
 
 
 class SerialDump:
-    def __init__(self):
+    """Writes the packets coming off the serial line into a timestamped session file.
 
-        self.f_b64 = Path(browse_button() + '/' + datetime.now().strftime("%Y%m%d-%H%M%S_%f")[:-3] + '.b64')
+    ``output_dir`` is asked for by the caller, not by this class.  It used to open a
+    tkinter directory chooser from here, which meant the recorder could not be used
+    without a GUI and -- worse -- that the dialog appeared at whatever point in startup
+    this object happened to be constructed, which was after the browser had already been
+    pointed at a server that was not listening yet.  Choosing the directory is a job for
+    whoever is talking to the user; see ``choose_output_directory`` in teensy_commander.
+    """
+
+    def __init__(self, output_dir):
+        self.output_dir = Path(output_dir)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S_%f")[:-3]
+        self.f_b64 = self.output_dir / f'{stamp}.b64'
         self.f_bin = self.f_b64.with_suffix('.bin')
 
         self.cobs_file = None

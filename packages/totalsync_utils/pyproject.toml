@@ -1,6 +1,6 @@
 [project]
 name = "totalsync-utils"
-version = "0.2.0"
+version = "0.3.0"
 description = "TotalSync data decoding utilities"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -29,10 +29,34 @@ dependencies = [
 totalsync-decode = "totalsync_utils.cli:main"
 totalsync-pinsheet = "totalsync_utils.pinsheet:main"
 totalsync-pinout = "totalsync_utils.pinout:main"
+totalsync-firmware = "totalsync_utils.firmware:main"
+
+[project.urls]
+Homepage = "https://github.com/NeuroNetMem/totalsync"
+Repository = "https://github.com/NeuroNetMem/totalsync"
+Documentation = "https://totalsync.readthedocs.io"
+Issues = "https://github.com/NeuroNetMem/totalsync/issues"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# The staged firmware payload is handed to every target by hatch_build.py as a forced
+# include, and forced files bypass this exclude. Excluding it here keeps the ordinary file
+# walk from *also* finding it and adding a second copy at the same archive path, which
+# hatchling rejects -- it is inside the package directory, so the walk sees it whenever a
+# .gitignore does not happen to cover it (as in an unpacked sdist, where the repo-root
+# anchored ignore rule no longer matches).
+[tool.hatch.build]
+exclude = ["totalsync_utils/data/firmware"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["totalsync_utils"]
+
+# firmware/ is a PlatformIO project at the root of the repository, not inside this package,
+# because that is where CLion and `pio run` want it. hatch_build.py stages a filtered copy
+# into totalsync_utils/data/firmware/ before each build and forces it into the artifact;
+# see that module's docstring for why it cannot be a force-include here. Registered at
+# [tool.hatch.build.hooks.*] rather than per target so the sdist and the wheel both get it.
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"

@@ -65,3 +65,18 @@ measured.
 .. autoclass:: PinoutGeometry
    :members:
 ```
+
+## Firmware
+
+The Teensy firmware ships inside this package as a PlatformIO project template. These hand
+it out; see {doc}`../totalsync-firmware` for the command-line front end and
+{doc}`../firmware` for what the firmware itself does.
+
+```{eval-rst}
+.. currentmodule:: totalsync_utils
+
+.. autofunction:: scaffold_firmware
+.. autofunction:: bundled_firmware_path
+.. autofunction:: list_experiments
+.. autofunction:: experiment_build_settings
+```

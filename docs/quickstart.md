@@ -8,9 +8,10 @@ Once TotalSync is [installed](installation.md), a session looks like this.
 totalsync --pinsheet docs/pinSheet_2026.json
 ```
 
-Pick the serial port in the startup window; the browser interface opens on
-<http://localhost:8000>. See the [`totalsync` reference](totalsync.md) for the other
-options, and use `-D` to try it with no Teensy attached.
+Pick the serial port in the startup window and press Play; TotalSync then asks where to
+write the session, and the browser interface opens on <http://localhost:8000> once the
+servers are up. Pass `-o DIR` to skip the directory dialog, or `--no-browser` to leave the
+browser alone. See the [`totalsync` reference](totalsync.md) for the other options.
 
 ## 2. Decode
 
@@ -33,7 +34,9 @@ See the [`totalsync-2p` reference](totalsync-2p.md).
 ## Adding a Teensy module
 
 To change which signals you synchronize, modify the Arduino sketch in
-`Teensy41_Totalsync/`. After a firmware change, regenerate the pin sheet so the channel
+the experiment under `firmware/src/experiments/` — see [Teensy firmware](firmware.md), or
+`totalsync-firmware init my-rig` for a project of your own without a checkout. After a
+firmware change, regenerate the pin sheet so the channel
 names follow the code — [`totalsync-pinsheet`](totalsync-pinsheet.md) does this, and
 `--merge` keeps the labels you have already written by hand.
 

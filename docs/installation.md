@@ -7,7 +7,7 @@ used. Installing `totalsync` gets all of them:
 | Distribution | Commands | What it is for |
 | --- | --- | --- |
 | `totalsync-webinterface` | `totalsync` | Recording: talk to the Teensy, serve the live browser interface |
-| `totalsync-utils` | `totalsync-decode`, `totalsync-pinsheet` | Turning recordings into analysis-ready data |
+| `totalsync-utils` | `totalsync-decode`, `totalsync-pinsheet`, `totalsync-pinout`, `totalsync-firmware` | Turning recordings into analysis-ready data, and the Teensy firmware |
 | `totalsync-2p` | `totalsync-2p` | Aligning two-photon imaging with the telemetry |
 | `totalsync` | — | Umbrella that depends on the three above |
 
@@ -32,7 +32,7 @@ It runs on Windows, macOS and Linux.
   * **Homebrew** Python (macOS) — `brew install python-tk`
   * **Debian / Ubuntu** — `sudo apt install python3-tk`
   * **Fedora** — `sudo dnf install python3-tkinter`
-* A **Teensy** running the TotalSync firmware (see [Teensy firmware](#teensy-firmware)).
+* A **Teensy** running the TotalSync firmware (see [Teensy firmware](firmware.md)).
   You can install and try the software without one — see the `-D` flag under
   [Running TotalSync](#running-totalsync).
 
@@ -120,17 +120,18 @@ Use this if you want to modify TotalSync. To just use it, install
 ### Step 1 — Get the code
 
 ```bash
-git clone <repository-url>
-cd TotalSync
+git clone https://github.com/NeuroNetMem/totalsync.git
+cd totalsync
 ```
 
-All five commands become available, not just `totalsync`:
+All six commands become available, not just `totalsync`:
 
 ```bash
 uv run totalsync --help
 uv run totalsync-decode --help
 uv run totalsync-pinsheet --help
 uv run totalsync-pinout --help
+uv run totalsync-firmware --help
 uv run totalsync-2p --help
 ```
 
@@ -229,7 +230,7 @@ Once it is running, see [Quick Start](quickstart.md) and the pin assignments in
 ## Updating
 
 **Installed as a tool:** name whichever package you installed — `totalsync` covers all
-five commands, `totalsync-utils` and `totalsync-2p` upgrade separately if you installed
+six commands, `totalsync-utils` and `totalsync-2p` upgrade separately if you installed
 them on their own.
 ```bash
 uv tool upgrade totalsync
@@ -296,16 +297,32 @@ uv build --all-packages
 distribution and silently leaves the other three at whatever version was in `dist/`
 before. The result is eight files in `dist/` — a wheel and a source archive each.
 
-Then check the one thing that can go missing without the build failing. The browser
-interface is the only non-Python payload, and it ships inside
-`totalsync-webinterface`, not the umbrella:
+Then check the two things that can go missing without the build failing. The browser
+interface ships inside `totalsync-webinterface`, not the umbrella:
 
 ```bash
 uv run python -m zipfile -l dist/totalsync_webinterface-*.whl | grep web/
 ```
 
-Fourteen files should be listed. Nothing here is generated at build time, so if this
-comes up empty the wheel would install a blank interface.
+Fourteen files should be listed; if it comes up empty the wheel would install a blank
+interface. The Teensy firmware ships inside `totalsync-utils`:
+
+```bash
+uv run python -m zipfile -l dist/totalsync_utils-*.whl | grep -c 'data/firmware/'
+```
+
+Nineteen. Unlike the interface, this payload *is* generated at build time:
+`packages/totalsync_utils/hatch_build.py` stages a filtered copy of the repository's
+`firmware/` directory into the package. So it is worth checking that the two builds
+`uv build` chains together — the source distribution, and then the wheel *from* that
+source distribution — both carry it:
+
+```bash
+tar -tzf dist/totalsync_utils-*.tar.gz | grep -c 'data/firmware/'   # also 19
+```
+
+If they ever disagree, `uv build --package totalsync-utils --sdist --wheel` builds both
+from the checkout instead of chaining them, which isolates which of the two is at fault.
 
 ### Test against TestPyPI first
 
@@ -367,7 +384,19 @@ gets identical versions.
 
 ## Teensy firmware
 
-Open `Teensy41_Totalsync/Teensy41_Totalsync.ino` in the Arduino IDE and upload it to the
-Teensy. You can modify it as needed; see
+The firmware is a [PlatformIO](https://platformio.org) project. It ships inside
+`totalsync-utils`, so a PyPI install already has it — copy it out to a directory of your
+own and build:
+
+```bash
+totalsync-firmware init my-rig
+cd my-rig
+pio run -e template_experiment -t upload
+```
+
+From a source checkout it is already there, in `firmware/`.
+
+[Teensy firmware](firmware.md) covers the toolchain, the three example experiments and how
+to write your own; see also
 [Extending TotalSync for new devices](extending.md) and the setup-specific examples under
 [Recording techniques](vsi.md).

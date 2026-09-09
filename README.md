@@ -23,6 +23,7 @@ uv tool install totalsync
  * **[General Introduction to TotalSync](docs/introduction.md)**
  * **[Installation](docs/installation.md)**
  * **[Quick start](docs/quickstart.md)**
+ * **[Teensy firmware](docs/firmware.md)**
  * **[Pin usage](docs/pin-usage.md)**
  * **[Extending TotalSync for new devices](docs/extending.md)**
  * **[Videos and images](docs/images)**
@@ -37,6 +38,8 @@ uv tool install totalsync
    `pinSheet.json` channel map from the Teensy firmware source
  * **[`totalsync-pinout`](docs/totalsync-pinout.md)** — draw that channel map onto a
    labelled picture of the Teensy, to check a wiring job at the bench
+ * **[`totalsync-firmware`](docs/totalsync-firmware.md)** — copy the Teensy firmware
+   out to a PlatformIO project of your own
  * **[`totalsync-2p`](docs/totalsync-2p.md)** — align ScanImage two-photon
    recordings with TotalSync telemetry
 
@@ -57,11 +60,12 @@ dependencies.
 | Path | Distribution | Provides |
 | --- | --- | --- |
 | `packages/totalsync_webinterface` | `totalsync-webinterface` | `totalsync` — acquisition, recording and the live browser interface |
-| `packages/totalsync_utils` | `totalsync-utils` | `totalsync-decode`, `totalsync-pinsheet`, `totalsync-pinout` |
+| `packages/totalsync_utils` | `totalsync-utils` | `totalsync-decode`, `totalsync-pinsheet`, `totalsync-pinout`, `totalsync-firmware` |
 | `packages/totalsync_2p` | `totalsync-2p` | `totalsync-2p` |
 | `.` | `totalsync` | umbrella that depends on the three above |
 
-`Teensy41_Totalsync/` holds the firmware, and `docs/` the documentation above.
+`firmware/` holds the Teensy firmware as a PlatformIO project, and `docs/` the
+documentation above.
 
 ## Contribute
 

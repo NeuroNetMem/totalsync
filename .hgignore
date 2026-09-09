@@ -1,0 +1,7 @@
+# This repository is git-only. The file exists to stop hatchling's search for an
+# hgignore -- which walks up from the project root and only stops at a .hg directory --
+# from running past the repository into the home directory of whoever runs the build and
+# force-including *that* file into every source distribution.
+#
+# Keep it empty of patterns: .gitignore is the one that matters.
+syntax: glob

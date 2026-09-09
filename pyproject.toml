@@ -5,7 +5,7 @@
 # `totalsync-utils` on its own without pyserial, pyzmq or tkinter.
 [project]
 name = "totalsync"
-version = "0.2.0"
+version = "0.3.0"
 description = "Teensy-based synchronization system for multi-modal neuroscience recordings"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,10 +25,14 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
 ]
+# Lower bounds, not just names: this distribution's [project.scripts] point into modules
+# that only exist from these versions on -- totalsync-firmware needs
+# totalsync_utils.firmware, new in 0.3. Without them a resolver is free to pair this
+# umbrella with an older member and produce commands that die on import.
 dependencies = [
-    "totalsync-webinterface",
-    "totalsync-utils",
-    "totalsync-2p",
+    "totalsync-webinterface>=0.1.2",
+    "totalsync-utils>=0.3",
+    "totalsync-2p>=0.1.3",
 ]
 
 # Forwarded so that `totalsync[extras]` and `uv sync --extra extras` keep working from
@@ -37,7 +41,7 @@ dependencies = [
 [project.optional-dependencies]
 extras = ["totalsync-webinterface[extras]"]
 
-# Re-declared here so that `uv tool install totalsync` puts all five commands on the
+# Re-declared here so that `uv tool install totalsync` puts all six commands on the
 # PATH in one isolated environment, which is what a recording or analysis machine wants.
 # A distribution that declares no executables of its own cannot be installed as a tool at
 # all -- uv removes it again and tells you to name a member instead.
@@ -49,7 +53,14 @@ totalsync = "totalsync_webinterface.teensy_commander:cli_entry"
 totalsync-decode = "totalsync_utils.cli:main"
 totalsync-pinsheet = "totalsync_utils.pinsheet:main"
 totalsync-pinout = "totalsync_utils.pinout:main"
+totalsync-firmware = "totalsync_utils.firmware:main"
 totalsync-2p = "totalsync_2p.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/NeuroNetMem/totalsync"
+Repository = "https://github.com/NeuroNetMem/totalsync"
+Documentation = "https://totalsync.readthedocs.io"
+Issues = "https://github.com/NeuroNetMem/totalsync/issues"
 
 [build-system]
 requires = ["hatchling"]

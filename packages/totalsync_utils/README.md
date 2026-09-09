@@ -1,6 +1,6 @@
 # totalsync-utils
 
-Decoding utilities for [TotalSync](https://github.com/fpbattaglia/totalsync) recordings.
+Decoding utilities for [TotalSync](https://github.com/NeuroNetMem/totalsync) recordings.
 
 * `totalsync-decode` — turn recorded `.b64` files into analysis-ready formats (numpy,
   MATLAB, [pynapple](https://pynapple.org)), with channels named from a `pinSheet.json`.
@@ -11,6 +11,9 @@ Decoding utilities for [TotalSync](https://github.com/fpbattaglia/totalsync) rec
 * `totalsync-pinout` — draw that `pinSheet.json` onto a labelled picture of the Teensy
   4.1, so a wiring job can be checked at the bench instead of read as JSON.
   [Reference](../../docs/totalsync-pinout.md)
+* `totalsync-firmware` — copy the Teensy firmware, which ships inside this package, out
+  to a PlatformIO project of your own, so it can be modified where you work.
+  [Reference](../../docs/totalsync-firmware.md)
 
 Importable as a library too: `decode_b64_files`, `load_pin_mapping`,
-`generate_pin_sheet`, `parse_firmware`, `render_pinout`.
+`generate_pin_sheet`, `parse_firmware`, `render_pinout`, `scaffold_firmware`.

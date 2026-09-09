@@ -29,6 +29,7 @@ import ast
 import datetime
 import io
 import json
+import os
 import re
 import sys
 import warnings
@@ -36,6 +37,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from pcpp import Action, OutputDirective, Preprocessor
+
+from .firmware import (DEFAULT_EXPERIMENT, bundled_firmware_path,
+                       experiment_build_settings, list_experiments)
 
 __all__ = [
     'FirmwarePinMap',
@@ -534,6 +538,48 @@ def _describe(firmware, sheet, stream):
         print(f'  * state[{state["idx"]}]        {state["name"]}', file=stream)
 
 
+def _resolve_source(args):
+    """Work out what to preprocess, from ``source`` / ``--bundled`` / ``--experiment``.
+
+    Returns ``(source, project, experiment)``.  ``project`` is ``None`` when a plain file
+    was named, which is the original behaviour and takes no build settings from anywhere.
+    """
+    if args.bundled and args.source:
+        raise ValueError('give either a source or --bundled, not both')
+
+    project = None
+    source = None
+    if args.bundled:
+        project = bundled_firmware_path()
+    elif args.source is None:
+        raise ValueError('name a firmware source or a PlatformIO project, or use '
+                         '--bundled for the one shipped with this package')
+    else:
+        named = Path(args.source)
+        if named.is_dir():
+            project = named
+        elif named.is_file():
+            source = named
+        else:
+            raise FileNotFoundError(f'source not found: {named}')
+
+    if project is None:
+        if args.experiment:
+            raise ValueError('--experiment needs --bundled or a PlatformIO project '
+                             'directory, not a single source file')
+        return source, None, None
+
+    experiment = args.experiment or DEFAULT_EXPERIMENT
+    known = list_experiments(project)
+    if experiment not in known:
+        raise ValueError(f'no experiment {experiment!r} in {project / "platformio.ini"} '
+                         f'(have: {", ".join(known) or "none"})')
+    source = project / 'src' / 'main.cpp'
+    if not source.is_file():
+        raise FileNotFoundError(f'no src/main.cpp in {project}')
+    return source, project, experiment
+
+
 def main(argv=None):
     """Entry point for ``totalsync-pinsheet``."""
     parser = argparse.ArgumentParser(
@@ -542,8 +588,15 @@ def main(argv=None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Print the pin sheet for the configuration selected in the source
-  totalsync-pinsheet arduino/Teensy41_totalsync.ino
+  # Print the pin sheet for a PlatformIO project: platformio.ini supplies the
+  # include path and the -D flags of the chosen experiment
+  totalsync-pinsheet firmware --experiment slm_aatc
+
+  # ...or for the firmware bundled with this package, with no checkout at all
+  totalsync-pinsheet --bundled --experiment slm_aatc
+
+  # A single source file still works, if you supply the include path yourself
+  totalsync-pinsheet firmware/src/main.cpp -I firmware/src/experiments/slm_aatc
 
   # Write it out
   totalsync-pinsheet docs/main_example.cpp -o docs/pinSheet.json
@@ -556,7 +609,18 @@ Examples:
   totalsync-pinsheet docs/main_example.cpp --merge docs/pinSheet.json -o docs/pinSheet.json
         """,
     )
-    parser.add_argument('source', help='Teensy firmware source (.cpp / .ino)')
+    parser.add_argument('source', nargs='?',
+                        help='Teensy firmware source (.cpp / .ino), or a PlatformIO '
+                             'project directory, in which case the source and the '
+                             'build settings are read from its platformio.ini')
+    parser.add_argument('--bundled', action='store_true',
+                        help='Read the firmware bundled with this package instead of '
+                             'naming a source (see totalsync-firmware)')
+    parser.add_argument('--experiment', metavar='NAME',
+                        help='PlatformIO environment to generate the sheet for, which '
+                             'supplies the -I and -D from platformio.ini. Needs '
+                             '--bundled or a project directory. '
+                             f'Default: {DEFAULT_EXPERIMENT}')
     parser.add_argument('-o', '--output', default='-',
                         help='Output pinSheet.json ("-" for stdout, the default)')
     parser.add_argument('-D', '--define', action='append', default=[], metavar='NAME[=VALUE]',
@@ -591,17 +655,37 @@ Examples:
     # read better without the "file:line: UserWarning:" apparatus around them.
     warnings.showwarning = lambda message, *a, **k: print(f'warning: {message}', file=sys.stderr)
 
-    source = Path(args.source)
-    if not source.is_file():
-        print(f'Error: source file not found: {source}', file=sys.stderr)
+    # A pin sheet is only right for one build configuration, and which pins are even
+    # visible depends on the include path: main.cpp includes experiment_config.h, which
+    # lives inside one experiment's directory. Naming a PlatformIO project instead of a
+    # file lets platformio.ini answer both questions -- and for slm_aatc that matters for
+    # correctness, not just convenience, since its -D SLM_DEBUG=1 is what names two of
+    # the output pins.
+    try:
+        source, project, experiment = _resolve_source(args)
+    except (OSError, ValueError) as exc:
+        print(f'Error: {exc}', file=sys.stderr)
         return 1
+
+    defines, include_dirs = list(args.define), list(args.include)
+    if project is not None:
+        ini_defines, ini_includes = experiment_build_settings(experiment, project)
+        # Prepended, so that a -D on the command line still wins: _preprocess applies
+        # defines in order, and undefines after all of them.
+        defines = ini_defines + defines
+        include_dirs = ini_includes + include_dirs
+        if not args.quiet:
+            flags = ' '.join([f'-D {d}' for d in ini_defines]
+                             + [f'-I {os.path.relpath(i, project)}' for i in ini_includes])
+            print(f'platformio env {experiment} in {project} ({flags})', file=sys.stderr)
+
     if args.merge and not Path(args.merge).is_file():
         print(f'Error: pin sheet to merge not found: {args.merge}', file=sys.stderr)
         return 1
 
     try:
-        firmware = parse_firmware(source, defines=args.define, undefines=args.undef,
-                                  include_dirs=args.include, exclude=args.exclude)
+        firmware = parse_firmware(source, defines=defines, undefines=args.undef,
+                                  include_dirs=include_dirs, exclude=args.exclude)
     except Exception as exc:
         print(f'Error parsing {source}: {exc}', file=sys.stderr)
         return 1
@@ -623,7 +707,10 @@ Examples:
 
     sheet = build_pin_sheet(
         firmware,
-        title=args.title or existing_title,
+        # Every experiment's main.cpp is called main.cpp, so a project derives its
+        # title from the environment instead.
+        title=args.title or existing_title or (
+            f'Teensy-TotalSync pin information: {experiment}' if project else None),
         updated=args.updated,
         acronyms=DEFAULT_ACRONYMS | {a.upper() for a in args.acronym},
         existing=existing,

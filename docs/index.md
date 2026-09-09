@@ -14,7 +14,7 @@ It was built to be adaptable and inexpensive, and has been used with two-photon 
 voltage-sensitive imaging, and Neuropixel electrophysiology, in combination with
 head-fixed virtual reality.
 
-## The five commands
+## The six commands
 
 ::::{grid} 1 1 2 2
 :gutter: 3
@@ -45,6 +45,13 @@ Draw that pin sheet onto a picture of the board, to check a wiring job at the be
 {doc}`Reference <totalsync-pinout>`
 :::
 
+:::{grid-item-card} `totalsync-firmware`
+Copy the Teensy firmware out to a PlatformIO project of your own, ready to modify and
+flash.
++++
+{doc}`Reference <totalsync-firmware>`
+:::
+
 :::{grid-item-card} `totalsync-2p`
 Align ScanImage two-photon recordings with the behavioural telemetry.
 +++
@@ -62,6 +69,7 @@ New here? Start with {doc}`introduction`, then {doc}`installation`.
 introduction
 installation
 quickstart
+firmware
 pin-usage
 extending
 ```
@@ -74,6 +82,7 @@ totalsync
 totalsync-decode
 totalsync-pinsheet
 totalsync-pinout
+totalsync-firmware
 totalsync-2p
 ```
 

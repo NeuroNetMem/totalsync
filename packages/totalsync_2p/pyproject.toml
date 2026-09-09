@@ -1,6 +1,6 @@
 [project]
 name = "totalsync-2p"
-version = "0.1.2"
+version = "0.1.3"
 description = "TotalSync 2-photon data synchronization"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -26,6 +26,12 @@ dependencies = [
 
 [project.scripts]
 totalsync-2p = "totalsync_2p.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/NeuroNetMem/totalsync"
+Repository = "https://github.com/NeuroNetMem/totalsync"
+Documentation = "https://totalsync.readthedocs.io"
+Issues = "https://github.com/NeuroNetMem/totalsync/issues"
 
 [build-system]
 requires = ["hatchling"]

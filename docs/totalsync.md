@@ -6,23 +6,26 @@ them to disk, and serve a live view of every channel to the browser.
 ## Synopsis
 
 ```
-totalsync [-s PORT] [-D] [-B] [-C] [-H HTTP_PORT] [-w WS_PORT]
-          [--pinsheet PATH] [-v]
+totalsync [-s PORT] [-o DIR] [--no-browser] [-D] [-B] [-C]
+          [-H HTTP_PORT] [-w WS_PORT] [--pinsheet PATH] [-v]
 ```
 
-With no arguments a startup window opens and asks which serial port the Teensy is on.
-From a source checkout, prefix with `uv run`.
+With no arguments a startup window opens and asks which serial port the Teensy is on;
+pressing Play then asks where to write the session, and the browser interface opens once
+the servers are up. From a source checkout, prefix with `uv run`.
 
 ## Options
 
 | Option | Meaning |
 | --- | --- |
 | `-s`, `--serial_port` | Serial port of the Teensy. Skips the startup dialog. |
+| `-o`, `--output-dir` | Directory to write the recording into. Skips the directory dialog; created if it does not exist. |
+| `--no-browser` | Do not open the browser at startup. For scripted or headless runs. |
 | `-D`, `--dummy` | Use a simulated Teensy — lets you try TotalSync with no hardware. |
 | `-B`, `--binfile` | Also write a decoded binary dump alongside the base64 one. |
 | `-C`, `--curses` | Show the text-mode status interface in the terminal. |
 | `-H`, `--http_port` | Port for the browser interface (default 8000). |
-| `-w`, `--ws_port` | Port for the WebSocket server (default 5678). |
+| `-w`, `--ws_port` | Port for the WebSocket server (default 5678). The browser client currently hardcodes 5678, so changing this stops the page receiving data. |
 | `--pinsheet PATH` | A `pinSheet.json` saying what each pin is wired to. See [Channel labels](#channel-labels). |
 | `-v`, `--verbose` | More logging detail. Logging is already at info level; `-v` switches it to debug. |
 

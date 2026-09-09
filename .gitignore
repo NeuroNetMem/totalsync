@@ -68,7 +68,6 @@ LogFile/
 *.elf
 *.bin
 .build/
-Teensy41_Totalsync/build/
 
 # ---------------------------------------------------------------------------
 # Node
@@ -164,3 +163,7 @@ $RECYCLE.BIN/
 # Sphinx / ReadTheDocs
 # ---------------------------------------------------------------------------
 docs/_build/
+
+# Staged by packages/totalsync_utils/hatch_build.py from firmware/ at build time;
+# the tree at firmware/ is the source of truth.
+/packages/totalsync_utils/totalsync_utils/data/firmware/

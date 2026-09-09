@@ -1,10 +1,13 @@
 import argparse
 import logging
+import os
 import sys
 import threading
 import time
 import tkinter as tk
 import webbrowser
+from pathlib import Path
+from tkinter import filedialog
 from tkinter import messagebox as mb
 
 import serial
@@ -114,6 +117,58 @@ def choose_serial_port(parent):
     return chosen[0] if chosen else ''
 
 
+def choose_output_directory():
+    """Modal dialog to pick the directory recordings are written into.
+
+    Returns the directory, or '' if the user cancelled.
+
+    Deliberately no ``parent=``, however obviously right passing one looks.  On macOS Tk
+    turns a file dialog with a parent into a *sheet* attached to that window
+    (tkMacOSXDialog.c: "Use a sheet if -parent is specified"), and the only window
+    available here is the withdrawn root - which still has a backing NSWindow, 200x200
+    near the top left corner.  The sheet is then anchored under a window a third the
+    panel's width, hanging off the edge of the screen, and a sheet cannot be dragged back
+    on.  Without a parent the panel is free floating, centred and movable.  Nothing is
+    lost by leaving it out: this dialog is shown before the browser is opened, so it comes
+    up in front anyway.
+
+    ``initialdir`` matters more than it looks: askdirectory() without one starts wherever
+    Tk was last, which on macOS is commonly '/' - a directory nobody wants to record into
+    and one that is not writable anyway.  The working directory is where the user cd'd to
+    before running the command, so it is the best guess available; a Finder or desktop
+    launch, where the working directory is '/', is not, hence the fall back to $HOME.
+    """
+    # Not to parent the dialog, but so that a root exists at all: with no default root,
+    # tkinter's Dialog.show() builds a throwaway Tk() and destroys it again afterwards,
+    # which is the second-interpreter crash get_root() exists to prevent. With one, it
+    # reuses it and the teardown is a no-op.
+    get_root()
+    start = Path.cwd()
+    if start == Path(start.anchor) or not os.access(start, os.W_OK):
+        start = Path.home()
+    return filedialog.askdirectory(
+        initialdir=str(start),
+        title='Where should TotalSync write this session?')
+
+
+def prepare_output_directory(directory):
+    """Make ``directory`` usable as a recording target, or raise ValueError saying why.
+
+    Called before the serial port and the servers come up, so that a bad path is reported
+    while nothing is running yet rather than by the first packet failing to be written.
+    """
+    directory = Path(directory).expanduser()
+    if directory.exists() and not directory.is_dir():
+        raise ValueError(f'not a directory: {directory}')
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ValueError(f'cannot create {directory}: {exc}') from None
+    if not os.access(directory, os.W_OK):
+        raise ValueError(f'not writable: {directory}')
+    return directory
+
+
 def welcome_dialog():
     """Show the startup window.
 
@@ -127,9 +182,9 @@ def welcome_dialog():
     quitting = []
 
     def on_play():
-        # The HTTP server is not running yet; the 'Reload' button on the next
-        # window exists to retry once it is.
-        open_web_interface()
+        # Just close the window: the browser is opened by main(), once the servers are
+        # actually listening. Opening it from here is what used to greet the user with
+        # "unable to connect".
         win.destroy()
 
     def on_quit():
@@ -161,8 +216,8 @@ def welcome_dialog():
 
 
 class TeensyCommander:
-    def __init__(self, serial_port, http_port, ws_port, curses_screen, write_bin=False, use_dummy=False,
-                 channel_labels=None):
+    def __init__(self, serial_port, http_port, ws_port, curses_screen, output_dir,
+                 write_bin=False, use_dummy=False, channel_labels=None):
         self.n_packet = 0
         self.packets_per_second = 0
         self.packet_timings = []
@@ -183,7 +238,8 @@ class TeensyCommander:
         self.shell_gui = CursesUI(self, curses_screen) if curses_screen is not None else None
         time.sleep(0.05)  # give some time to let log display catch all startup messages
 
-        self.serial_dump = SerialDump()
+        self.output_dir = Path(output_dir)
+        self.serial_dump = SerialDump(self.output_dir)
         self.serial_port = serial_port
         self.web_server = WebInterface(http_port, ws_port, self, channel_labels=channel_labels)
 
@@ -279,7 +335,6 @@ class TeensyCommander:
         logging.debug('Reset')
         try:
             reset = pack_reset_packet()
-            SerialDump()
             if reset is None:
                 logging.error('Failed to pack!')
                 return
@@ -324,7 +379,8 @@ class TeensyCommander:
 
 
 def main(screen, cli_args, channel_labels=None):
-    # SerialDump() opens a tkinter directory chooser, so a root must already exist.
+    # menu() builds its control window on this root, so it has to exist before
+    # run_forever() gets there.
     get_root()
     logging.info(
         "Known serial ports: " + repr(sorted([comport.device for comport in serial.tools.list_ports.comports()])))
@@ -335,9 +391,19 @@ def main(screen, cli_args, channel_labels=None):
                          http_port=cli_args.http_port,
                          ws_port=cli_args.ws_port,
                          curses_screen=screen,
+                         output_dir=cli_args.output_dir,
                          write_bin=cli_args.binfile,
                          use_dummy=cli_args.dummy,
                          channel_labels=channel_labels)
+
+    # Here and not earlier. WebInterface(), constructed inside TeensyCommander.__init__,
+    # binds the HTTP port, and the serial port is opened after that -- so reaching this
+    # line means the whole stack came up and a request will be answered. The browser used
+    # to be opened from the Play button instead, before any of it existed, which is what
+    # produced "unable to connect" and made the Reload button necessary.
+    if not cli_args.no_browser:
+        open_web_interface()
+
     try:
         tc.run_forever()
     except KeyboardInterrupt:
@@ -353,8 +419,17 @@ def cli_entry():
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--serial_port', default=None,
                         help='Serial port of the Teensy. If omitted, a startup dialog asks for one.')
-    parser.add_argument('-w', '--ws_port', default=WS_PORT)
-    parser.add_argument('-H', '--http_port', default=HTTP_PORT)
+    parser.add_argument('-o', '--output-dir', default=None, metavar='DIR',
+                        help='Directory to write the recording into. If omitted, a '
+                             'startup dialog asks for one.')
+    parser.add_argument('--no-browser', action='store_true',
+                        help='Do not open the web interface in a browser at startup')
+    parser.add_argument('-w', '--ws_port', type=int, default=WS_PORT,
+                        help=f'Websocket port (default {WS_PORT}). Note that the browser '
+                             f'client hardcodes {WS_PORT}, so changing this stops the '
+                             f'page from receiving data.')
+    parser.add_argument('-H', '--http_port', type=int, default=HTTP_PORT,
+                        help=f'Port the web interface is served on (default {HTTP_PORT})')
     parser.add_argument('-B', '--binfile', action='store_true', help='Write decoded binary serial dump file')
     parser.add_argument('-C', '--curses', action='store_true', help='Use cursesUI in terminal')
     parser.add_argument('-D', '--dummy', action='store_true',
@@ -408,6 +483,26 @@ def cli_entry():
             destroy_root()
             return
         cli_args.serial_port = port or DEFAULT_SERIAL_PORT
+
+    # Before the servers and the browser, not after. Nothing downstream needs the
+    # directory in order to start -- the HTTP server only wants a port and the channel
+    # labels -- but it does have to be answered before the browser is pointed at
+    # anything, because the dialog blocks the main thread while it is up. Asking here
+    # also means it appears while this application still has the focus, rather than
+    # behind a browser window that has just been given it.
+    if cli_args.output_dir is None:
+        cli_args.output_dir = choose_output_directory()
+        if not cli_args.output_dir:
+            logging.info('No output directory chosen, so nothing was started.')
+            destroy_root()
+            return
+    try:
+        cli_args.output_dir = prepare_output_directory(cli_args.output_dir)
+    except ValueError as exc:
+        logging.error(f'Cannot record into that directory: {exc}')
+        destroy_root()
+        return 1
+    logging.info(f'Recording into {cli_args.output_dir}')
 
     if cli_args.curses and curses is not None:
         curses.wrapper(main, cli_args, channel_labels)

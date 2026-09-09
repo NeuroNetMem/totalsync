@@ -1,6 +1,6 @@
 [project]
 name = "totalsync-webinterface"
-version = "0.1.1"
+version = "0.1.2"
 description = "TotalSync acquisition: serial reader, live browser interface and recorder"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,6 +37,12 @@ extras = [
 
 [project.scripts]
 totalsync = "totalsync_webinterface.teensy_commander:cli_entry"
+
+[project.urls]
+Homepage = "https://github.com/NeuroNetMem/totalsync"
+Repository = "https://github.com/NeuroNetMem/totalsync"
+Documentation = "https://totalsync.readthedocs.io"
+Issues = "https://github.com/NeuroNetMem/totalsync/issues"
 
 [build-system]
 requires = ["hatchling"]

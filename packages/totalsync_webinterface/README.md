@@ -1,6 +1,6 @@
 # totalsync-webinterface
 
-Acquisition side of [TotalSync](https://github.com/fpbattaglia/totalsync): reads packets from a
+Acquisition side of [TotalSync](https://github.com/NeuroNetMem/totalsync): reads packets from a
 Teensy 4.1 running the TotalSync firmware over USB serial, records them, and serves a
 live view of all 42 digital/analog channels plus 8 state variables to the browser at
 1 kHz.
