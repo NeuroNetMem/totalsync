@@ -3,12 +3,13 @@
 //
 
 
-#include <PacketSerial.h>
+
 #include "experiment_config.h"
 #include "Experiment.h"
 #include "PulsePin.h"
-class SLM_AATCExperiment : public Experiment {
-private:
+namespace {
+  class SLM_AATCExperiment : public Experiment {
+  private:
 
     // Runtime switch for the SLM experiment, replacing the former SLM_EXPERIMENT
     // compile-time flag so it can be toggled between runs without a reflash. Read
@@ -45,11 +46,11 @@ private:
     // before the trigger may fire. All three durations are counted in gather()
     // ticks, which is why gatherTimer must stay at a 1000 us interval.
     enum slmSelectPhase : uint8_t {
-        slmSelIdle, // line LOW, waiting for slm_stim_armed
-        slmSelReset, // holding the reset pulse HIGH
-        slmSelData, // shifting out the 8 data bits
-        slmSelWait, // byte sent, holding the post-transmission pause
-        slmSelDone // pause elapsed, firing one pulse per frame clock edge
+      slmSelIdle, // line LOW, waiting for slm_stim_armed
+      slmSelReset, // holding the reset pulse HIGH
+      slmSelData, // shifting out the 8 data bits
+      slmSelWait, // byte sent, holding the post-transmission pause
+      slmSelDone // pause elapsed, firing one pulse per frame clock edge
     };
 
     static constexpr uint8_t slmSelectResetTicks = 10; // reset pulse length, ms
@@ -82,14 +83,15 @@ private:
                   "slm_stim_duration must be at least one gather() tick");
 
     void AATC();
-public:
+  public:
     ~SLM_AATCExperiment() override = default;
     void setup() override; // gets called in setup()
     void loopMicro() override; // gets called in loop()
     void loopMilliPre() override; // gets called in gather() before serial port and pin updates
     void loopMilliPost() override; // gets called in gather() after serial port and pin updates
     void reset() override; // gets called in reset()
-};
+  };
+}
 
 void SLM_AATCExperiment::setup() {
     ;

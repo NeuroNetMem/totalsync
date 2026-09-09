@@ -2,29 +2,47 @@
 // Created by Francesco Battaglia on 07/09/2026.
 //
 
-#include <PacketSerial.h>
+// This is a template experiment definition. To use in totalsync, you can make a copy of the template experiment file,
+// change the name of the Experiemnt subclass and the name of the .cpp file, and specify the pinout in the experiment_config.h file
+// whose name needs to stay unchanged.
+
 
 #include "experiment_config.h"
 
-class TemplateExperiment : public Experiment {
+namespace {
+    // rename to something you like, consistently. The definition is private to this file, so all edits should be
+    // in here.
+    class TemplateExperiment : public Experiment {
 
-private:
-    int iPacket = 0;
-    int exper = 0;
-    int preshock = 0;
-    void runExperiment();
-    void runPreShock();
+    private:
+        // here you can define all the variables that you need to maintain the state of your experiment, for example
+        // int state_variable_1 = 0;
+        // int state_variable_2 = 0;
+        // float state_variable_3 = 0.0;
 
-public:
-    ~TemplateExperiment() override = default;
-    void setup() override; // gets called in setup()
-    void loopMicro() override; // gets called in loop()
-    void loopMilliPre() override; // gets called in gather() before serial port and pin updates
-    void loopMilliPost() override; // gets called in gather() after serial port and pin updates
-    void reset() override; // gets called in reset()
+        // as well as helper functions that you may need, for example
+        // void runProtocol();
 
-};
+    public:
+        // this can stay as is (with the class name changed)
+        ~TemplateExperiment() override = default;
 
+        // these are the key entry points that are called in the Teensy loop. The signature needs to be `void method()` and all state info
+        // passed via private class members.
+        void setup() override; // gets called in setup(), when the Teensy is powered on. NOTE: if the code initializes hardware
+                               // make sure that that hardware is on at that time
+        void loopMicro() override; // gets called in the Teensy loop, even microsecond, so this is reserved for operations that require
+                                   // fine granularity (e.g. handling time-sensitive hardware). It should be a lot weight function
+        void loopMilliPre() override; // gets called in gather(), every millisecond before serial port communication and pin updates
+        void loopMilliPost() override; // gets called in gather() every millisecong but after serial port and pin operations.
+                                       // likely, all behavioral-task related operations will go in one of these two methods.
+        void reset() override; // gets called in reset()
+
+    };
+}
+
+
+// the implementation of the experiment class (here as a dummy, empty implementation)
 void TemplateExperiment::setup() {
     ;
 }
@@ -34,73 +52,18 @@ void TemplateExperiment::loopMicro() {
 }
 
 void TemplateExperiment::loopMilliPre() {
-
-    if (exper == 1) {
-      runExperiment();
-    }
-
-    if (preshock == 1) {
-      runPreShock();
-    }
+   ;
 }
 
 void TemplateExperiment::loopMilliPost() {
-    exper = digitalReadFast(EXPER);
-    preshock = digitalReadFast(PRESHOCK);
-
+  ;
 }
 
 void TemplateExperiment::reset() {
     ;
 }
 
-void TemplateExperiment::runExperiment() {
-    iPacket++; // Increment iPacket
-    // Initial random off interval in milliseconds (12 to 40 seconds)
-    static int offInterval = random(12000, 40001);
-    static int trialCount = 0; // To track the number of trials
 
-    // Run 10 repetitions
-    if (trialCount < 10) {
-        // Off period: keep pin LOW for a random time between 12 and 40 seconds
-        if (iPacket == offInterval) {
-            digitalWriteFast(SHOCK, HIGH);
-            digitalWriteFast(TESTSHOCK, HIGH);
-            digitalWriteFast(LED_BUILTIN, HIGH);
-        }
-
-        // On period: 2 seconds HIGH
-        if (iPacket == offInterval + 2000) {
-            digitalWriteFast(SHOCK, LOW);
-            digitalWriteFast(TESTSHOCK, LOW);
-            digitalWriteFast(LED_BUILTIN, LOW);
-            iPacket = 0;      // Reset iPacket
-            trialCount++;     // Increment the trial count
-            // Generate a new random off interval for the next trial
-            offInterval = random(12000, 40001);
-        }
-    }
-}
-
-void TemplateExperiment::runPreShock() {
-    iPacket++;
-    // Run 3 repetitions of 2 seconds HIGH, 30 seconds LOW
-    for (int i = 0; i < 3; i++) {
-        // Set the shock pins and the built-in LED to LOW for 30 seconds
-        if (iPacket == 10000) {
-            digitalWriteFast(SHOCK, HIGH);
-            digitalWriteFast(TESTSHOCK, HIGH);
-            digitalWriteFast(LED_BUILTIN, HIGH);
-        }
-
-        if (iPacket == 12000) {
-            digitalWriteFast(SHOCK, LOW);
-            digitalWriteFast(LED_BUILTIN, LOW);
-            digitalWriteFast(TESTSHOCK, LOW);
-            iPacket = 0;
-        }
-    }
-}
 
 
 // generate the experiment object of the proper class, defined here

@@ -50,7 +50,7 @@ constexpr int nDigitalOut = std::size(pinsDigitalOut);
 const int pinsDigital[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
                            11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 29,
                            30, 31, 32, 33, 34, 35, 36, 37, 38, 39};
-constexpr int nDigital = sizeof(pinsDigital) / sizeof(pinsDigital[0]);
+constexpr int nDigital = std::size(pinsDigital);
 
 // Number of state variables shipped with every data packet
 constexpr int nStates = 8;
@@ -74,6 +74,7 @@ constexpr uint8_t strideInstSTATE = 5;
 constexpr uint16_t syncCounterMax = 0x95FF;
 constexpr uint16_t syncCounterMin = 0x9500;
 
+constexpr float EncoderConversion = 0.077; // was 0.0159
 // ---------------------------------------------------------------------------
 // 3. Packet / instruction types
 // ---------------------------------------------------------------------------
@@ -442,11 +443,11 @@ static void gather() {
 
   noInterrupts();
   const long new_pos = wheelEncoder.read(); // negative or positive?
-  const long position_feel = (long)(new_pos * 0.077); // 0.0159
+  const long position_feel = static_cast<long>(new_pos * EncoderConversion);
   interrupts();
 
-  for (int p = 0; p < nStates; p++) {
-    packet.variables[p] = 0L;
+  for (long & variable : packet.variables) {
+    variable = 0L;
   }
 
   packet.variables[0] = new_pos;
@@ -469,6 +470,7 @@ static void gather() {
 
 
 // State machine
+// ReSharper disable once CppParameterMayBeConstPtrOrRef
 void applyState(dataPacket* packet) {
   (void)packet; // apply finite state machine updates here
   counter++;
@@ -481,19 +483,20 @@ void reset() {
   current_millis = 0;
   current_micros = 0;
 
+  // noinspection
   for (int i = 0; i < nStates; i++) {
     bufferedStates[i] = 0;
   }
 
-  for (int i = 0; i < nDigitalOut; i++) {
-    digitalWriteFast(pinsDigitalOut[i], LOW);
+  for (int i : pinsDigitalOut) {
+    digitalWriteFast(i, LOW);
   }
-  for (int i = 0; i < nDigitalIn; i++) {
-    digitalWriteFast(pinsDigitalIn[i], LOW);
+  for (int i : pinsDigitalIn) {
+    digitalWriteFast(i, LOW);
   }
 
-  for (int i = 0; i < nPulsePins; i++) {
-    pulsePins[i]->restart();
+  for (auto & pulsePin : pulsePins) {
+    pulsePin->restart();
   }
 
   experiment->reset();
@@ -578,6 +581,7 @@ void processInstruction(const uint8_t* buf, size_t buf_sz) {
         if (target >= nPulsePins) {
           continue;
         }
+        // ReSharper disable once CppObjectMemberMightNotBeInitialized
         pulsePins[target]->pulseMicro(bul.ulong * 1000);
       }
       break;
@@ -591,11 +595,13 @@ void processInstruction(const uint8_t* buf, size_t buf_sz) {
           bul.bytes[b] = buf[pIdx + 1 + b];
         }
         char msg[24];
+        // ReSharper disable once CppObjectMemberMightNotBeInitialized
         snprintf(msg, sizeof(msg), "%u:%ld", target, bul.slong);
         debugPrint(msg);
         if (target >= nStates) {
           continue;
         }
+        // ReSharper disable once CppObjectMemberMightNotBeInitialized
         bufferedStates[target] = bul.slong;
       }
       break;
@@ -638,7 +644,7 @@ void dumpBuffer(const uint8_t* buffer, size_t size) {
   debugPrint(msg);
 
   // 16 bytes per line, so each write stays well inside the 64 B TX ring
-  const size_t bytesPerLine = 16;
+  constexpr size_t bytesPerLine = 16;
   char line[bytesPerLine * 3 + 1];
   size_t pos = 0;
 
@@ -674,11 +680,11 @@ void ephysrand() {
 
 
 // PulsePin lookup
-PulsePin* getPulsePinById(byte id) {
-  for (int i = 0; i < nPulsePins; ++i) {
-    if (pulsePins[i]->getId() == id) {
-      return pulsePins[i];
-    }
-  }
-  return nullptr;
-}
+// PulsePin* getPulsePinById(byte id) {
+//   for (int i = 0; i < nPulsePins; ++i) {
+//     if (pulsePins[i]->getId() == id) {
+//       return pulsePins[i];
+//     }
+//   }
+//   return nullptr;
+// }
