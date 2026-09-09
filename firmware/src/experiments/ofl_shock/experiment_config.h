@@ -1,7 +1,5 @@
-
-
-#ifndef PINS_SHOCK_H
-#define PINS_SHOCK_H
+#ifndef EXPERIMENT_CONFIG_H
+#define EXPERIMENT_CONFIG_H
 #include "Experiment.h"
 // Named pins in use on the Teensy
 #define WHEEL_ENC_PINA 2
@@ -34,23 +32,6 @@
 #define LOOP_INDICATOR 40
 #define GATHER_INDICATOR 41
 
-class OFL_ShockExperiment : public Experiment {
+Experiment *makeExperiment();
 
-private:
-    int iPacket = 0;
-    int exper = 0;
-    int preshock = 0;
-    void runExperiment();
-    void runPreShock();
-
-public:
-    ~OFL_ShockExperiment() override = default;
-    void setup() override; // gets called in setup()
-    void loopMicro() override; // gets called in loop()
-    void loopMilliPre() override; // gets called in gather() before serial port and pin updates
-    void loopMilliPost() override; // gets called in gather() after serial port and pin updates
-    void reset() override; // gets called in reset()
-
-};
-
-#endif // PINS_SHOCK_H
+#endif // EXPERIMENT_CONFIG_H

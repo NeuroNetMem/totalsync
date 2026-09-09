@@ -4,8 +4,26 @@
 
 #include <PacketSerial.h>
 
-#include "pins_shock.h"
+#include "experiment_config.h"
 
+class OFL_ShockExperiment : public Experiment {
+
+private:
+    int iPacket = 0;
+    int exper = 0;
+    int preshock = 0;
+    void runExperiment();
+    void runPreShock();
+
+public:
+    ~OFL_ShockExperiment() override = default;
+    void setup() override; // gets called in setup()
+    void loopMicro() override; // gets called in loop()
+    void loopMilliPre() override; // gets called in gather() before serial port and pin updates
+    void loopMilliPost() override; // gets called in gather() after serial port and pin updates
+    void reset() override; // gets called in reset()
+
+};
 
 void OFL_ShockExperiment::setup() {
     ;
@@ -83,3 +101,7 @@ void OFL_ShockExperiment::runPreShock() {
         }
     }
 }
+
+
+// generate the experiment object of the proper class, defined here
+Experiment *makeExperiment() { return new OFL_ShockExperiment(); }

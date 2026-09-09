@@ -32,7 +32,7 @@
 
 // Named pins. Included here rather than with the other headers because it
 // reads SLM_DEBUG.
-#include "pins_slm.h"
+#include <experiment_config.h>
 
 // Analog and digital channels scanned every gather tick
 const int pinsAnalogIn[] = {16, 17, 18, 19, 20, 21, 22};
@@ -242,8 +242,7 @@ static void syncBlink();
 
 static void ephysrand();
 
-
-static Experiment *experiment = new SLM_AATCExperiment();
+static Experiment *experiment = makeExperiment();
 //
 // 6. Arduino entry points
 // ---------------------------------------------------------------------------
