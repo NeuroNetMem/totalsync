@@ -124,12 +124,13 @@ git clone <repository-url>
 cd TotalSync
 ```
 
-All four commands become available, not just `totalsync`:
+All five commands become available, not just `totalsync`:
 
 ```bash
 uv run totalsync --help
 uv run totalsync-decode --help
 uv run totalsync-pinsheet --help
+uv run totalsync-pinout --help
 uv run totalsync-2p --help
 ```
 
@@ -228,7 +229,7 @@ Once it is running, see [Quick Start](quickstart.md) and the pin assignments in
 ## Updating
 
 **Installed as a tool:** name whichever package you installed — `totalsync` covers all
-four commands, `totalsync-utils` and `totalsync-2p` upgrade separately if you installed
+five commands, `totalsync-utils` and `totalsync-2p` upgrade separately if you installed
 them on their own.
 ```bash
 uv tool upgrade totalsync

@@ -8,6 +8,9 @@ Decoding utilities for [TotalSync](https://github.com/fpbattaglia/totalsync) rec
 * `totalsync-pinsheet` — generate that `pinSheet.json` from the Teensy firmware source,
   so the channel names stay in step with the code that produced the data.
   [Reference](../../docs/totalsync-pinsheet.md)
+* `totalsync-pinout` — draw that `pinSheet.json` onto a labelled picture of the Teensy
+  4.1, so a wiring job can be checked at the bench instead of read as JSON.
+  [Reference](../../docs/totalsync-pinout.md)
 
 Importable as a library too: `decode_b64_files`, `load_pin_mapping`,
-`generate_pin_sheet`, `parse_firmware`.
+`generate_pin_sheet`, `parse_firmware`, `render_pinout`.

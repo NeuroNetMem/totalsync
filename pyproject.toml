@@ -37,7 +37,7 @@ dependencies = [
 [project.optional-dependencies]
 extras = ["totalsync-webinterface[extras]"]
 
-# Re-declared here so that `uv tool install totalsync` puts all four commands on the
+# Re-declared here so that `uv tool install totalsync` puts all five commands on the
 # PATH in one isolated environment, which is what a recording or analysis machine wants.
 # A distribution that declares no executables of its own cannot be installed as a tool at
 # all -- uv removes it again and tells you to name a member instead.
@@ -48,6 +48,7 @@ extras = ["totalsync-webinterface[extras]"]
 totalsync = "totalsync_webinterface.teensy_commander:cli_entry"
 totalsync-decode = "totalsync_utils.cli:main"
 totalsync-pinsheet = "totalsync_utils.pinsheet:main"
+totalsync-pinout = "totalsync_utils.pinout:main"
 totalsync-2p = "totalsync_2p.cli:main"
 
 [build-system]

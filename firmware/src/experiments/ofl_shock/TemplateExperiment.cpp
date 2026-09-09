@@ -6,7 +6,7 @@
 
 #include "experiment_config.h"
 
-class OFL_ShockExperiment : public Experiment {
+class TemplateExperiment : public Experiment {
 
 private:
     int iPacket = 0;
@@ -16,7 +16,7 @@ private:
     void runPreShock();
 
 public:
-    ~OFL_ShockExperiment() override = default;
+    ~TemplateExperiment() override = default;
     void setup() override; // gets called in setup()
     void loopMicro() override; // gets called in loop()
     void loopMilliPre() override; // gets called in gather() before serial port and pin updates
@@ -25,15 +25,15 @@ public:
 
 };
 
-void OFL_ShockExperiment::setup() {
+void TemplateExperiment::setup() {
     ;
 }
 
-void OFL_ShockExperiment::loopMicro() {
+void TemplateExperiment::loopMicro() {
     ;
 }
 
-void OFL_ShockExperiment::loopMilliPre() {
+void TemplateExperiment::loopMilliPre() {
 
     if (exper == 1) {
       runExperiment();
@@ -44,17 +44,17 @@ void OFL_ShockExperiment::loopMilliPre() {
     }
 }
 
-void OFL_ShockExperiment::loopMilliPost() {
+void TemplateExperiment::loopMilliPost() {
     exper = digitalReadFast(EXPER);
     preshock = digitalReadFast(PRESHOCK);
 
 }
 
-void OFL_ShockExperiment::reset() {
+void TemplateExperiment::reset() {
     ;
 }
 
-void OFL_ShockExperiment::runExperiment() {
+void TemplateExperiment::runExperiment() {
     iPacket++; // Increment iPacket
     // Initial random off interval in milliseconds (12 to 40 seconds)
     static int offInterval = random(12000, 40001);
@@ -82,7 +82,7 @@ void OFL_ShockExperiment::runExperiment() {
     }
 }
 
-void OFL_ShockExperiment::runPreShock() {
+void TemplateExperiment::runPreShock() {
     iPacket++;
     // Run 3 repetitions of 2 seconds HIGH, 30 seconds LOW
     for (int i = 0; i < 3; i++) {
@@ -104,4 +104,4 @@ void OFL_ShockExperiment::runPreShock() {
 
 
 // generate the experiment object of the proper class, defined here
-Experiment *makeExperiment() { return new OFL_ShockExperiment(); }
+Experiment *makeExperiment() { return new TemplateExperiment(); }

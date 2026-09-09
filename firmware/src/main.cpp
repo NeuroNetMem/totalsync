@@ -16,7 +16,7 @@
 #include <Encoder.h>
 #include <FastCRC.h>
 #include <PacketSerial.h>
-#include <cmath>
+// #include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -36,121 +36,133 @@
 
 // Analog and digital channels scanned every gather tick
 const int pinsAnalogIn[] = {16, 17, 18, 19, 20, 21, 22};
-const int nAnalogIn = sizeof(pinsAnalogIn) / sizeof(pinsAnalogIn[0]);
+constexpr int nAnalogIn = std::size(pinsAnalogIn);
 
 const int pinsDigitalIn[] = {0, 1, 2,  3,  4,  5,  6,  7,
                              8, 9, 10, 11, 12, 13, 14, 15};
-const int nDigitalIn = sizeof(pinsDigitalIn) / sizeof(pinsDigitalIn[0]);
+constexpr int nDigitalIn = std::size(pinsDigitalIn);
 
 const int pinsDigitalOut[] = {24, 25, 26, 27, 28, 29, 30, 31,
                               32, 33, 34, 35, 36, 37, 38, 39};
-const int nDigitalOut = sizeof(pinsDigitalOut) / sizeof(pinsDigitalOut[0]);
+constexpr int nDigitalOut = std::size(pinsDigitalOut);
 
 // All addressable digital pins (inputs followed by outputs), used by instUNITY
 const int pinsDigital[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
                            11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 29,
                            30, 31, 32, 33, 34, 35, 36, 37, 38, 39};
-const int nDigital = sizeof(pinsDigital) / sizeof(pinsDigital[0]);
+constexpr int nDigital = sizeof(pinsDigital) / sizeof(pinsDigital[0]);
 
 // Number of state variables shipped with every data packet
-const int nStates = 8;
+constexpr int nStates = 8;
 
 // // On-board LED
 // const int ledPin = LED_BUILTIN;
 
 // Pulse pins for the pupil camera
-const int pinsPulsePins[] = {30, 31};
-const int nPulsePins = sizeof(pinsPulsePins) / sizeof(pinsPulsePins[0]);
+constexpr int pinsPulsePins[] = {30, 31};
+constexpr int nPulsePins = std::size(pinsPulsePins);
 
 // Instruction strides, in bytes (target byte + payload)
-const uint8_t strideInstLOW = 2;
-const uint8_t strideInstHIGH = 2;
-const uint8_t strideInstTOGGLE = 2;
-const uint8_t strideInstUNITY = 2;
-const uint8_t strideInstPULSE = 5;
-const uint8_t strideInstSTATE = 5;
+constexpr uint8_t strideInstLOW = 2;
+constexpr uint8_t strideInstHIGH = 2;
+constexpr uint8_t strideInstTOGGLE = 2;
+constexpr uint8_t strideInstUNITY = 2;
+constexpr uint8_t strideInstPULSE = 5;
+constexpr uint8_t strideInstSTATE = 5;
 
 // Synchronization pattern for the pupil camera
-const uint16_t syncCounterMax = 0x95FF;
-const uint16_t syncCounterMin = 0x9500;
+constexpr uint16_t syncCounterMax = 0x95FF;
+constexpr uint16_t syncCounterMin = 0x9500;
 
 // ---------------------------------------------------------------------------
 // 3. Packet / instruction types
 // ---------------------------------------------------------------------------
 
-enum packetType : uint8_t {
-  ptSTATUS,
-  ptINSTR,
-  ptERROR,
-  ptOK,
-  ptACK
-};
+namespace {
+  enum packetType : uint8_t {
+    ptSTATUS,
+    ptINSTR,
+    ptERROR,
+    ptOK [[maybe_unused]],
+    ptACK [[maybe_unused]]
+  };
+}
 
-enum instructionType : uint8_t {
-  instPIN_LOW = 0,
-  instPIN_HIGH = 1,
-  instPIN_TOGGLE = 2,
-  instPIN_PULSE = 3,
-  instSET_STATE = 4,
-  instUNITY = 5,
-  instRESET = 6,
-  instHANDSHAKE = 149
-};
+namespace {
+  enum instructionType : uint8_t {
+    instPIN_LOW = 0,
+    instPIN_HIGH = 1,
+    instPIN_TOGGLE = 2,
+    instPIN_PULSE = 3,
+    instSET_STATE = 4,
+    instUNITY = 5,
+    instRESET = 6,
+    instHANDSHAKE [[maybe_unused]] = 149
+  };
+}
 
-union bytesToLong {
-  byte bytes[4];
-  unsigned long ulong;
-  long slong;
-};
+namespace {
+  union bytesToLong {
+    byte bytes[4];
+    unsigned long ulong;
+    long slong;
+  };
+}
 
 // Running packet count, incremented by every packet constructor
 static volatile unsigned long packetCount = 0;
 
-struct dataPacket {
-  uint8_t type;               // 1 B, packet type
-  uint8_t length;             // 1 B, packet size
-  uint16_t crc16;             // 2 B, CRC16
-  unsigned long packetID;     // 4 B, running packet count
+namespace {
+  struct dataPacket {
+    uint8_t type;               // 1 B, packet type
+    uint8_t length;             // 1 B, packet size
+    uint16_t crc16;             // 2 B, CRC16
+    unsigned long packetID;     // 4 B, running packet count
 
-  unsigned long us_start;     // 4 B, gather start timestamp
-  unsigned long us_end;       // 4 B, transmit timestamp
-  uint16_t analog[nAnalogIn]; // 16 B, ADC values
-  long variables[nStates];    // 32 B, variables (encoder, speed, etc)
-  uint16_t digitalIn;         // 2 B, digital inputs
-  uint16_t digitalOut;        // 2 B, digital outputs
-  uint8_t padding[1];         // 1 B, align to 4B
+    unsigned long us_start;     // 4 B, gather start timestamp
+    unsigned long us_end;       // 4 B, transmit timestamp
+    uint16_t analog[nAnalogIn]; // 16 B, ADC values
+    long variables[nStates];    // 32 B, variables (encoder, speed, etc)
+    uint16_t digitalIn;         // 2 B, digital inputs
+    uint16_t digitalOut;        // 2 B, digital outputs
+    [[maybe_unused]] uint8_t padding[1];         // 1 B, align to 4B
 
-  dataPacket()
+    dataPacket()
       : type(ptSTATUS),
         length(sizeof(dataPacket)),
         crc16(0),
-        packetID(packetCount++),
+        packetID(packetCount++), us_start(0), us_end(0), analog{}, variables{},
         digitalIn(0),
-        digitalOut(0) {}
-};
+        digitalOut(0), padding{} {
+    }
+  };
+}
 
 // Worst-case size of one data packet on the wire: the COBS-encoded payload
 // (size + size/254 + 1, see COBS::getEncodedBufferSize) plus the delimiter
 // byte, which PacketSerial::send() writes as a second, separate call. 72 B of
 // payload -> 74 B on the wire.
-const int packetWireSize =
+constexpr int packetWireSize =
     static_cast<int>(sizeof(dataPacket) + sizeof(dataPacket) / 254 + 2);
 
-struct errorPacket {
-  uint8_t type;            // 1 B, packet type
-  uint8_t length;          // 1 B, packet size
-  uint16_t crc16;          // 2 B, CRC16
-  unsigned long packetID;  // 4 B, running packet count
-  unsigned long us_start;  // 4 B, gather start timestamp
+namespace {
+  struct errorPacket {
+    uint8_t type;            // 1 B, packet type
+    uint8_t length;          // 1 B, packet size
+    uint16_t crc16;          // 2 B, CRC16
+    unsigned long packetID;  // 4 B, running packet count
+    [[maybe_unused]] unsigned long us_start;  // 4 B, gather start timestamp
 
-  char message[16];        // 16 B, error message
+    [[maybe_unused]] char message[16];        // 16 B, error message
 
-  errorPacket()
+    errorPacket()
       : type(ptERROR),
         length(sizeof(errorPacket)),
         crc16(0),
-        packetID(packetCount++) {}
-};
+        packetID(packetCount++), us_start(0), message{} {
+    }
+  };
+}
 
 // ---------------------------------------------------------------------------
 // 4. Global state
@@ -197,7 +209,7 @@ static int lick = 0;
 // int lickBaseline = 0;
 // int ipacket = 0;
 // int frame = 0;
-static int camera_trigger = 0;
+// static int camera_trigger = 0;
 static int ephys = 1;
 // int rad = 0;
 
@@ -237,7 +249,7 @@ static void dumpBuffer(const uint8_t* buffer, size_t size);
 static void debugPrint(const char* msg);
 
 // Pulse pins and camera / ephys synchronization
-static PulsePin* getPulsePinById(byte id);
+//static PulsePin* getPulsePinById(byte id);
 static void syncBlink();
 
 static void ephysrand();
@@ -259,8 +271,8 @@ void setup() {
   // Analog input channels
   analogReadResolution(16); // change the resolution to 16 bits and read A0
 
-  for (int i = 0; i < nAnalogIn; i++) {
-    pinMode(pinsAnalogIn[i], INPUT);
+  for (int i : pinsAnalogIn) {
+    pinMode(i, INPUT);
   }
   // NOTE: no-op with the current pin table (nAnalogIn == 8)
   for (int i = 8; i < nAnalogIn; i++) {
@@ -273,8 +285,8 @@ void setup() {
   }
 
   // Digital output channels
-  for (int i = 0; i < nDigitalOut; i++) {
-    pinMode(pinsDigitalOut[i], OUTPUT);
+  for (int i : pinsDigitalOut) {
+    pinMode(i, OUTPUT);
   }
   pinMode(VALVE, OUTPUT);
   pinMode(GATHER_INDICATOR, OUTPUT);
@@ -370,8 +382,8 @@ void loop() {
   }
 
   // Check if timed pins need updates
-  for (int i = 0; i < nPulsePins; ++i) {
-    pulsePins[i]->updateMicro();
+  for (auto & pulsePin : pulsePins) {
+    pulsePin->updateMicro();
   }
 
   experiment->loopMicro();
@@ -410,7 +422,7 @@ static void gather() {
     packet.digitalIn |= digitalReadFast(pinsDigitalIn[i]) << i;
   }
 
-  camera_trigger = digitalReadFast(TRIGGER_C);
+  // camera_trigger = digitalReadFast(TRIGGER_C);
   reward = digitalReadFast(REWARD);
   // ephys = digitalReadFast(ephys_trigger);
 

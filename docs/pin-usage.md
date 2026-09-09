@@ -1,5 +1,14 @@
 # Pin usage
 
+The table below is the hand-maintained record of what each pad is wired to.
+{doc}`totalsync-pinsheet` generates the same information as a `pinSheet.json`
+straight from the firmware, and {doc}`totalsync-pinout` draws it onto the board:
+
+```{image} images/pinout_example.png
+:alt: A Teensy 4.1 pinout with every sampled pad labelled with its function and channel name
+:width: 100%
+```
+
 DigitalInput | Used | For | DigitalOutput | Used | For | Analog | Used | For             
 ------------ | ------------- | ------------- | ------------- | ------------- | -------------  | -------------  | -------------  | -------------           
 0 | Yes | Camera1 | 24 | Yes |  Valve | 16 | No | |

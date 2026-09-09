@@ -14,7 +14,7 @@ It was built to be adaptable and inexpensive, and has been used with two-photon 
 voltage-sensitive imaging, and Neuropixel electrophysiology, in combination with
 head-fixed virtual reality.
 
-## The four commands
+## The five commands
 
 ::::{grid} 1 1 2 2
 :gutter: 3
@@ -37,6 +37,12 @@ sheet.
 Generate that pin sheet from the Teensy firmware source, so channel names track the code.
 +++
 {doc}`Reference <totalsync-pinsheet>`
+:::
+
+:::{grid-item-card} `totalsync-pinout`
+Draw that pin sheet onto a picture of the board, to check a wiring job at the bench.
++++
+{doc}`Reference <totalsync-pinout>`
 :::
 
 :::{grid-item-card} `totalsync-2p`
@@ -67,6 +73,7 @@ extending
 totalsync
 totalsync-decode
 totalsync-pinsheet
+totalsync-pinout
 totalsync-2p
 ```
 

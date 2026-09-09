@@ -1,6 +1,6 @@
 [project]
 name = "totalsync-utils"
-version = "0.1.3"
+version = "0.2.0"
 description = "TotalSync data decoding utilities"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,11 +22,13 @@ dependencies = [
     "tqdm",
     "pynapple",
     "pcpp",
+    "matplotlib",
 ]
 
 [project.scripts]
 totalsync-decode = "totalsync_utils.cli:main"
 totalsync-pinsheet = "totalsync_utils.pinsheet:main"
+totalsync-pinout = "totalsync_utils.pinout:main"
 
 [build-system]
 requires = ["hatchling"]

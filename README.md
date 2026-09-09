@@ -35,6 +35,8 @@ uv tool install totalsync
    files into numpy, MATLAB or pynapple formats, with named channels
  * **[`totalsync-pinsheet`](docs/totalsync-pinsheet.md)** — generate the
    `pinSheet.json` channel map from the Teensy firmware source
+ * **[`totalsync-pinout`](docs/totalsync-pinout.md)** — draw that channel map onto a
+   labelled picture of the Teensy, to check a wiring job at the bench
  * **[`totalsync-2p`](docs/totalsync-2p.md)** — align ScanImage two-photon
    recordings with TotalSync telemetry
 
@@ -55,7 +57,7 @@ dependencies.
 | Path | Distribution | Provides |
 | --- | --- | --- |
 | `packages/totalsync_webinterface` | `totalsync-webinterface` | `totalsync` — acquisition, recording and the live browser interface |
-| `packages/totalsync_utils` | `totalsync-utils` | `totalsync-decode`, `totalsync-pinsheet` |
+| `packages/totalsync_utils` | `totalsync-utils` | `totalsync-decode`, `totalsync-pinsheet`, `totalsync-pinout` |
 | `packages/totalsync_2p` | `totalsync-2p` | `totalsync-2p` |
 | `.` | `totalsync` | umbrella that depends on the three above |
 

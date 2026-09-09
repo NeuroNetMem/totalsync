@@ -43,3 +43,25 @@ and for what the fields mean.
 
 .. autofunction:: prettify_macro_name
 ```
+
+## Pin diagrams
+
+These draw a pin sheet onto a labelled picture of the Teensy 4.1; see
+{doc}`../totalsync-pinout` for the command-line front end and for how the artwork is
+measured.
+
+```{eval-rst}
+.. currentmodule:: totalsync_utils
+
+.. autofunction:: render_pinout
+.. autofunction:: detect_geometry
+```
+
+### Supporting types
+
+```{eval-rst}
+.. currentmodule:: totalsync_utils.pinout
+
+.. autoclass:: PinoutGeometry
+   :members:
+```
