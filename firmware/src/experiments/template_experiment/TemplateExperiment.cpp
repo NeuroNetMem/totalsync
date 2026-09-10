@@ -56,7 +56,8 @@ void TemplateExperiment::loopMilliPre() {
 }
 
 void TemplateExperiment::loopMilliPost() {
-  ;
+    // default e.g. lick detection logic is defined in the superclass, it can be changed if needed
+  Experiment::loopMilliPost();
 }
 
 void TemplateExperiment::reset() {

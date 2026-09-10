@@ -256,6 +256,7 @@ void SLM_AATCExperiment::loopMilliPre() {
 }
 
 void SLM_AATCExperiment::loopMilliPost() {
+  Experiment::loopMilliPost(); // for lick detection logic
 #ifdef SLM_DEBUG
   AATC_trigger = true;
 #else

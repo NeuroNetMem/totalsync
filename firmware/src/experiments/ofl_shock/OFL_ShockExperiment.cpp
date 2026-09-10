@@ -47,6 +47,7 @@ void OFL_ShockExperiment::loopMilliPre() {
 }
 
 void OFL_ShockExperiment::loopMilliPost() {
+    Experiment::loopMilliPost();
     exper = digitalReadFast(EXPER);
     preshock = digitalReadFast(PRESHOCK);
 

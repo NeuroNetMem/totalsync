@@ -35,7 +35,7 @@
 #include <experiment_config.h>
 
 // Analog and digital channels scanned every gather tick
-const int pinsAnalogIn[] = {16, 17, 18, 19, 20, 21, 22};
+const int pinsAnalogIn[] = {16, 17, 18, 19, 20, 21, 22, 23};
 constexpr int nAnalogIn = std::size(pinsAnalogIn);
 
 const int pinsDigitalIn[] = {0, 1, 2,  3,  4,  5,  6,  7,
@@ -74,7 +74,6 @@ constexpr uint8_t strideInstSTATE = 5;
 constexpr uint16_t syncCounterMax = 0x95FF;
 constexpr uint16_t syncCounterMin = 0x9500;
 
-constexpr float EncoderConversion = 0.077; // was 0.0159
 // ---------------------------------------------------------------------------
 // 3. Packet / instruction types
 // ---------------------------------------------------------------------------
@@ -191,37 +190,18 @@ static Encoder wheelEncoder(WHEEL_ENC_PINA, WHEEL_ENC_PINB);
 // Timed output pins
 static PulsePin* pulsePins[nPulsePins];
 
-// Moving average for lick detection, superseded by the IR lick detector that
-// gather() thresholds directly
-// const int windowSize = 10;    // size of moving average window
-// int lickReadings[windowSize]; // the readings from the lick input
-// int windowIndex = 0;          // the index of the current reading
-// int totalLickReadings = 0;    // the running total
-// int averageLickReadings = 0;  // the average
-static int lickThresh = 2600;
-static bool binaryLick = false;
 
 // Intermediate values
 // long encoderPosition = 0;
 static int last_packet_took = 0;
 static int reward = 0;
-static int lick = 0;
-// int lickBaselineCorr = 0;
-// int lickBaseline = 0;
-// int ipacket = 0;
-// int frame = 0;
-// static int camera_trigger = 0;
-static int ephys = 1;
-// int rad = 0;
 
-// int epacket = 0;
-// int t = 0;
+static int ephys = 1;
 
 
 static volatile unsigned char counter = 0;
 static volatile long bufferedStates[nStates];
 
-// volatile bool gatherNow = false;
 static volatile bool packetReady = false;
 
 // Pupil camera synchronization counter
@@ -428,22 +408,12 @@ static void gather() {
   // ephys = digitalReadFast(ephys_trigger);
 
   experiment->loopMilliPost();
-  // With the IR lick detector we don't need a moving average anymore
-  lick = analogRead(LICK);
-
-  if (lick >= lickThresh) {
-    digitalWriteFast(LICKDETECT, HIGH); // redundant?
-    binaryLick = true;
-  } else {
-    digitalWriteFast(LICKDETECT, LOW);
-    binaryLick = false;
-  }
 
   digitalWriteFast(VALVE, reward);
 
   noInterrupts();
   const long new_pos = wheelEncoder.read(); // negative or positive?
-  const long position_feel = static_cast<long>(new_pos * EncoderConversion);
+  const long position_feel = static_cast<long>(new_pos * experiment->EncoderConversion);
   interrupts();
 
   for (long & variable : packet.variables) {
@@ -452,8 +422,8 @@ static void gather() {
 
   packet.variables[0] = new_pos;
   packet.variables[1] = position_feel;
-  packet.variables[2] = binaryLick;
-  packet.variables[3] = lick;
+  packet.variables[2] = experiment->binaryLick;
+  packet.variables[3] = experiment->lick;
   packet.variables[4] = 0;
   packet.variables[5] = 0;
   packet.variables[6] = 0;
