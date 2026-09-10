@@ -4,6 +4,7 @@ Generate a `pinSheet.json` pin map from the Teensy firmware source, so the map
 `totalsync-decode` uses to name channels stays in step with the code that produces
 the data.
 
+
 ## Synopsis
 
 ```

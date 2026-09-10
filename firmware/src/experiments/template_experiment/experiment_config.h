@@ -46,6 +46,7 @@
 #define LICKDETECT 26
 
 // activates a random bar code signal that can be used for e.g. synchronization with a microscope or with electrophysiology
+// TODO explain synchronization, also Scanimage setup 
 #define EPHYS_SYNC 37
 
 // used for synchronization with the camera (See PIN_CAMERA_FSTROBE)

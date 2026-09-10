@@ -56,14 +56,14 @@ totalsync -D
 ## Channel labels
 
 Without a pin sheet the interface calls every channel by its position —
-`digital_input_6`, `analog_input_1`, `states_0`. Pass one and each channel with a `"for"`
+`digital_input_6`, `analog_input_1`, `states_0`. If a pinsheet.json file is passedeach channel with a `"for"`
 entry is labelled with what it is actually wired to; the rest keep their generated names.
 
 ```bash
 totalsync --pinsheet docs/pinSheet_2026.json
 ```
 
-`docs/pinSheet_2026.json` is the sheet for the OFL rig. To make your own, generate it
+`docs/pinSheet_2026.json` is an exmaple. To make your own, generate it
 from the firmware with [`totalsync-pinsheet`](totalsync-pinsheet.md) and then edit the
 `"for"` fields — the generator can only name what the firmware names, so the result
 almost always wants a pass by hand.

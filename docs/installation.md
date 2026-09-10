@@ -35,8 +35,8 @@ It runs on Windows, macOS and Linux.
 * A **Teensy** running the TotalSync firmware (see [Teensy firmware](firmware.md)).
   You can install and try the software without one — see the `-D` flag under
   [Running TotalSync](#running-totalsync).
-
-`windows-curses` is required only on Windows and is installed automatically there.
+* [**PlatformIO**](https://platformio.org/) a cross-platform IDE and build system for embedded development, providing a more powerful and flexible environment for Teensy development than the Aruino IDE, with interfaces and plugins for many popular editors and IDEs, including CLion and VSCode. At a minimum, [PlatformIO Core](https://docs.platformio.org/en/latest/core/installation/index.html) is required. Installation of the IDE or the plugins for VSCode or CLion are recommended
+* `windows-curses` is required only on Windows and is installed automatically there.
 
 ### Installing uv
 
@@ -64,7 +64,7 @@ alongside it.
 
 ## Installing from PyPI
 
-This is the route for **using** TotalSync rather than developing it.
+This is the route for **using** TotalSync rather than developing it (besides firmware customization).
 
 ### Recommended: as a standalone tool
 
@@ -86,6 +86,7 @@ uv tool install totalsync-utils      # totalsync-decode, totalsync-pinsheet
 uv tool install totalsync-2p         # totalsync-2p
 ```
 
+
 ### Alternative: into a virtual environment
 
 If you prefer a normal virtual environment, for instance to import TotalSync from your
@@ -96,6 +97,12 @@ uv venv
 uv pip install totalsync
 ```
 
+which can also be done separately on the analysis packages
+
+```bash
+uv tool install totalsync-utils      # totalsync-decode, totalsync-pinsheet
+uv tool install totalsync-2p         # totalsync-2p
+```
 <details>
 <summary>Without uv (plain <code>pip</code>)</summary>
 
@@ -124,16 +131,7 @@ git clone https://github.com/NeuroNetMem/totalsync.git
 cd totalsync
 ```
 
-All six commands become available, not just `totalsync`:
 
-```bash
-uv run totalsync --help
-uv run totalsync-decode --help
-uv run totalsync-pinsheet --help
-uv run totalsync-pinout --help
-uv run totalsync-firmware --help
-uv run totalsync-2p --help
-```
 
 ### Step 2 — Create the environment and install
 
@@ -158,7 +156,16 @@ To work on a single package in isolation, `uv sync --package totalsync-utils`.
 ```bash
 uv run totalsync
 ```
+All six commands become available, not just `totalsync`:
 
+```bash
+uv run totalsync --help
+uv run totalsync-decode --help
+uv run totalsync-pinsheet --help
+uv run totalsync-pinout --help
+uv run totalsync-firmware --help
+uv run totalsync-2p --help
+```
 `uv run` uses the project environment without you having to activate it, and re-syncs
 first if dependencies have changed. If you prefer activating:
 
@@ -311,14 +318,14 @@ interface. The Teensy firmware ships inside `totalsync-utils`:
 uv run python -m zipfile -l dist/totalsync_utils-*.whl | grep -c 'data/firmware/'
 ```
 
-Nineteen. Unlike the interface, this payload *is* generated at build time:
+Unlike the interface, this payload *is* generated at build time:
 `packages/totalsync_utils/hatch_build.py` stages a filtered copy of the repository's
 `firmware/` directory into the package. So it is worth checking that the two builds
 `uv build` chains together — the source distribution, and then the wheel *from* that
 source distribution — both carry it:
 
 ```bash
-tar -tzf dist/totalsync_utils-*.tar.gz | grep -c 'data/firmware/'   # also 19
+tar -tzf dist/totalsync_utils-*.tar.gz | grep -c 'data/firmware/'   # same number of files
 ```
 
 If they ever disagree, `uv build --package totalsync-utils --sdist --wheel` builds both
