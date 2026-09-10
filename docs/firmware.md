@@ -36,7 +36,7 @@ pio run -e my_rig -t upload    # build and flash the Teensy
 `upload_protocol = teensy-cli` means flashing goes through the Teensy Loader, so the
 board needs to be plugged in and, the first time, may need its program button pressed.
 
-Three environments ship as examples, one per experiment:
+Four environments ship as examples, one per experiment:
 
 | Environment | What it is |
 | --- | --- |
@@ -45,7 +45,7 @@ Three environments ship as examples, one per experiment:
 | `ofl_shock` | Observational fear learning, with shock and pre-shock phases |
 | `widefield_generic` | A generic widefield rig, with no task logic |
 
-There is no `default_envs`, so a bare `pio run` builds all three.
+There is no `default_envs`, so a bare `pio run` builds all four.
 
 :::{note}
 `-D USB_TRIPLE_SERIAL` in the shared `[env]` section is required, not a preference:
@@ -142,6 +142,7 @@ Pins are assigned a function in the experiment_config.h file in the experiment d
 - `slm-aatc` includes code for controlling a SLM optogenetic stimulator in scanimage, generating triggers timed on the imaging scanner flyback (to avoid light contamination in the imaging) and using a 1-wire serial protocol to communicate to scanimage which stimulation pattern must be emitted
 - `ofl-shock` includes code for fear conditioning experiments
 - `widefield-generic` includes code for controlling frame acquisition from two Basler cameras, enabling ratiometric imaging. In addition, it controls alternate activation of light sources for simultaneous fluorescence and reflectance imaging.
+- `template_experiment` is a reference implementation, only including the basic features discussed above (which are not part of the experiment class)
 
 ## After a firmware change
 

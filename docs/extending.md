@@ -8,7 +8,7 @@ experiment under `firmware/src/experiments/`.
 
 ## customizing an experiment
 
-1. create a firmware project stub with {doc}`totalsync-firware`. Open it in your favorite editor or IDE (with platformio plugin).
+1. create a firmware project stub with {doc}`totalsync-firmware`. Open it in your favorite editor or IDE (with platformio plugin).
 
 2. write your own pinout: add or modify PINs definitions by editing/adding preprocessor macro definitions (`#define`) in `your_experiment/experiment_config.h`
 
