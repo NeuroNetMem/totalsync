@@ -56,7 +56,8 @@ namespace {
     static constexpr uint8_t slmSelectResetTicks = 10; // reset pulse length, ms
     static constexpr uint8_t slmSelectDataBits = 8;
     slmSelectPhase slm_select_phase = slmSelIdle;
-    uint8_t slm_select_tick = 0; // ticks elapsed in the current phase
+    // Shared phase counter; uint16_t permits settling pauses up to 65,535 ms.
+    uint16_t slm_select_tick = 0; // ticks elapsed in the current phase
     byte slm_select_byte = 0; // slm_stim_selected, latched at tx start
 
     int AATC_trigger = 0;
@@ -67,10 +68,9 @@ namespace {
     unsigned long triggertime = 1000;
     unsigned long tonelength = 0;
     unsigned long rewardtime = 0;
-    // slm_select_tick counts the pause, so a wait longer than the counter can hold
-    // would wrap and never reach the comparison.
-    static_assert(slm_stim_waittime >= 0 && slm_stim_waittime <= 255,
-                  "slm_stim_waittime must fit in slm_select_tick (uint8_t)");
+    // slm_select_tick counts the pause, so slm_stim_waittime must fit its range.
+    static_assert(slm_stim_waittime >= 0 && slm_stim_waittime <= UINT16_MAX,
+                  "slm_stim_waittime must fit in slm_select_tick (uint16_t)");
 
     // slm_stim_pulses_left is pre-decremented on every pulse, so a zero-length
     // train would wrap and run for 256 frames instead of none.
