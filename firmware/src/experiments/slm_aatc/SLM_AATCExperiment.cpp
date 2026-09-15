@@ -33,7 +33,7 @@ namespace {
     bool slm_stim_armed = false;
     static constexpr int slm_stim_n_triggers = 3;
     static constexpr int slm_stim_duration = 10;
-    static constexpr int slm_stim_waittime = 10;
+    static constexpr int slm_stim_waittime = 1000;
     bool slm_stim_active = false; // trigger currently held high
     unsigned long slm_stim_end_millis = 0; // when to release the trigger
     int slm_frame_clock_prev = HIGH; // frame clock level on the last tick
@@ -372,7 +372,7 @@ void SLM_AATCExperiment::AATC() {
 
   if (slm_experiment) {
 #ifdef SLM_DEBUG
-    if (slm_stim_selected >= 128) slm_stim_selected = 0;
+    if (slm_stim_selected >= 3) slm_stim_selected = 1;
 #else
     slm_stim_selected = Tone;
 #endif
