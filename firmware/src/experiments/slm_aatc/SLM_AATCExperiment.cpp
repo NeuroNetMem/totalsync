@@ -61,8 +61,8 @@ namespace {
     unsigned long triggertime = 1000;
     unsigned long tonelength = 0;
     unsigned long rewardtime = 0;
-    unsigned long iti_min = 29000;
-    unsigned long iti_max = 45000;
+    unsigned long iti_min = 6050; // 29000;
+    unsigned long iti_max = 6100; //45000;
     // Experimental logic: a stimulus was selected this trial and should be fired
     // as soon as it is ready.
     bool slm_fire_due = false;
@@ -290,7 +290,7 @@ void SLM_AATCExperiment::AATC() {
     rewardtime = triggertime + 3000;
     tonelength = triggertime + 2000;
 
-    triggertime = triggertime + random(29000, 45000);
+    triggertime = triggertime + random(iti_min, iti_max);
     n_sound1 += 1;
     n_sound2 = 0;
     Tone = random(2);

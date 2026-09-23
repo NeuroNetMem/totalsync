@@ -71,6 +71,18 @@
 #define LOOP_INDICATOR 40
 #define GATHER_INDICATOR 41
 
+// State channels shipped in every data packet (packet.variables[]), written
+// through state_variables[] (see Experiment.h). 0-3 and 7 are filled by gather()
+// in main.cpp; 4-6 are free for the experiment - rename them when used.
+#define STATE_WHEEL_POS 0        // raw encoder count
+#define STATE_WHEEL_POS_SCALED 1 // count * EncoderConversion
+#define STATE_BINARY_LICK 2
+#define STATE_LICK 3
+#define STATE_FREE_4 4
+#define STATE_FREE_5 5
+#define STATE_FREE_6 6
+#define STATE_LAST_PACKET_TOOK 7 // duration of the previous gather(), us
+
 Experiment *makeExperiment();
 
 #endif // EXPERIMENT_CONFIG_H

@@ -5,6 +5,14 @@
 #ifndef TOTALSYNCAATC_EXPERIMENT_H
 #define TOTALSYNCAATC_EXPERIMENT_H
 
+// State channels of the data packet, defined in main.cpp. gather() copies the
+// whole array into packet.variables[] every tick, after the experiment hooks
+// have run. Index it with the STATE_* macros from experiment_config.h: only the
+// channels marked free there belong to the experiment, the others are
+// overwritten by gather(). Written from both loop() and gather() (timer ISR)
+// context, hence volatile.
+extern volatile long state_variables[];
+
 class Experiment {
 
 

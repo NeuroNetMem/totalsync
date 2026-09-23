@@ -30,7 +30,7 @@
 #define EXTSERIAL Serial1
 
 
-// Named pins, defined per experiment.
+// Named pins and state channels, defined per experiment.
 #include <experiment_config.h>
 
 // Analog and digital channels scanned every gather tick
@@ -200,6 +200,15 @@ static int ephys = 1;
 
 static volatile unsigned char counter = 0;
 static volatile long bufferedStates[nStates];
+
+// State channels, declared extern in Experiment.h so the experiment can write
+// its free channels; they must keep external linkage - do not make this static.
+volatile long state_variables[nStates] = {};
+static_assert(STATE_WHEEL_POS < nStates && STATE_WHEEL_POS_SCALED < nStates &&
+              STATE_BINARY_LICK < nStates && STATE_LICK < nStates &&
+              STATE_FREE_4 < nStates && STATE_FREE_5 < nStates &&
+              STATE_FREE_6 < nStates && STATE_LAST_PACKET_TOOK < nStates,
+              "STATE_* channel out of range of packet.variables");
 
 static volatile bool packetReady = false;
 
@@ -415,18 +424,15 @@ static void gather() {
   const long position_feel = static_cast<long>(new_pos * experiment->EncoderConversion);
   interrupts();
 
-  for (long & variable : packet.variables) {
-    variable = 0L;
+  state_variables[STATE_WHEEL_POS] = new_pos;
+  state_variables[STATE_WHEEL_POS_SCALED] = position_feel;
+  state_variables[STATE_BINARY_LICK] = experiment->binaryLick;
+  state_variables[STATE_LICK] = experiment->lick;
+  state_variables[STATE_LAST_PACKET_TOOK] = last_packet_took;
+  // The free channels carry whatever the experiment last wrote to them.
+  for (int i = 0; i < nStates; i++) {
+    packet.variables[i] = state_variables[i];
   }
-
-  packet.variables[0] = new_pos;
-  packet.variables[1] = position_feel;
-  packet.variables[2] = experiment->binaryLick;
-  packet.variables[3] = experiment->lick;
-  packet.variables[4] = 0;
-  packet.variables[5] = 0;
-  packet.variables[6] = 0;
-  packet.variables[7] = last_packet_took;
   packet.us_end = current_micros;
 
   last_packet_took = current_micros - packet.us_start;
@@ -455,6 +461,7 @@ void reset() {
   // noinspection
   for (int i = 0; i < nStates; i++) {
     bufferedStates[i] = 0;
+    state_variables[i] = 0;
   }
 
   for (int i : pinsDigitalOut) {

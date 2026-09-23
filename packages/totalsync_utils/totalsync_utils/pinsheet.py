@@ -78,6 +78,8 @@ _SCALAR_RE = r'\b(?:const|constexpr|static)\s+(?:(?:unsigned|signed)\s+)?\w+\s+{
 _STATE_ASSIGN_RE = re.compile(
     r'\bpacket\s*\.\s*variables\s*\[\s*(\d+)\s*\]\s*=\s*([A-Za-z_]\w*)\s*;'
 )
+#: Prefix of the macros naming the state channels, in ``experiment_config.h``.
+_STATE_PREFIX = 'STATE_'
 _IFDEF_RE = re.compile(r'^[ \t]*#[ \t]*(?:ifdef|ifndef)[ \t]+(\w+)', re.M)
 _IF_RE = re.compile(r'^[ \t]*#[ \t]*(?:if|elif)\b([^\n]*(?:\\\n[^\n]*)*)', re.M)
 _IDENT_RE = re.compile(r'\b[A-Za-z_]\w*\b')
@@ -268,9 +270,9 @@ def _config_flags(raw_text):
 def _infer_states(text, n_states):
     """Best-effort state names, from ``packet.variables[i] = <identifier>;``.
 
-    The firmware has no declared names for the state vector, so this reads the
-    variable each slot is filled from.  A later assignment to the same slot wins,
-    matching what the compiled code does.
+    Fallback for firmware that does not name its state channels with ``STATE_*``
+    macros: this reads the variable each slot is filled from.  A later assignment
+    to the same slot wins, matching what the compiled code does.
     """
     states = {}
     for index, identifier in _STATE_ASSIGN_RE.findall(text):
@@ -316,13 +318,22 @@ def parse_firmware(source, defines=(), undefines=(), include_dirs=(), exclude=()
     # -D on the command line is a configuration choice by definition.
     flags = _config_flags(raw_text) | {d.split('=', 1)[0] for d in defines} | set(exclude)
 
+    n_states = _parse_scalar(text, 'nStates') or 0
+
     pin_defines = []
+    declared_states = {}
     for name, macro in macros.items():
         # Leading underscores mark identifiers reserved for the implementation:
         # __FILE__, pcpp's own __PCPP__, and anything a real toolchain predefines.
         if name.startswith('_') or name in flags or macro.arglist is not None:
             continue
         value = _eval_int(''.join(token.value for token in macro.value))
+        # STATE_* macros name state channels, not pins, though their values
+        # (0..nStates-1) coincide with digital input pin numbers.
+        if name.startswith(_STATE_PREFIX):
+            if value is not None and 0 <= value and (not n_states or value < n_states):
+                declared_states[value] = _snake_case(name[len(_STATE_PREFIX):])
+            continue
         if value is None or value not in known_pins:
             continue
         pin_defines.append(PinDefine(name=name, pin=value,
@@ -330,14 +341,16 @@ def parse_firmware(source, defines=(), undefines=(), include_dirs=(), exclude=()
                                      lineno=getattr(macro, 'lineno', 0) or 0))
     pin_defines.sort(key=lambda d: (d.lineno, d.name))
 
-    n_states = _parse_scalar(text, 'nStates') or 0
+    # Declared names win over those inferred from the assignments.
+    states = _infer_states(text, n_states)
+    states.update(declared_states)
 
     return FirmwarePinMap(
         path=source,
         arrays=arrays,
         defines=pin_defines,
         config_flags=flags,
-        inferred_states=_infer_states(text, n_states),
+        inferred_states=states,
         n_states=n_states,
         missing_includes=missing,
     )
