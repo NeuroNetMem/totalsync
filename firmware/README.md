@@ -1,3 +1,5 @@
+This branch is for the continuoation of debugging SLM stim select code
+
 # TotalSync Teensy firmware
 
 The firmware for a [TotalSync](https://github.com/NeuroNetMem/totalsync) module: a
