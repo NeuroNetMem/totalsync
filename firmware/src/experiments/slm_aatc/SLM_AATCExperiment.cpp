@@ -16,19 +16,6 @@ namespace {
     // from gather() (timer ISR) and meant to be written from loop() context, hence
     // volatile.
     volatile bool slm_experiment = true;
-#ifdef SLM_DEBUG
-    // Simulated scanner frame clock, so the SLM path can be exercised on the bench
-    // with nothing attached to SCANNER_FRAME_CLOCK. debug_frame_clock replaces the
-    // pin reading in gather() and is mirrored on DEBUG_FRAME_CLOCK_OUT for scoping.
-    //
-    // The low phase must stay above one gather() tick, or the falling edge can fall
-    // between two samples and be missed - the same Nyquist limit the real clock is
-    // subject to.
-    bool debug_frame_clock = false;
-    byte debug_frame_clock_high_millis = 26;
-    byte debug_frame_clock_low_millis = 4;
-    byte debug_frame_clock_tick = 0; // ticks elapsed in the current phase
-#endif
     // SLM stimulation
     bool slm_stim_armed = false;
     static constexpr int slm_stim_n_triggers = 3;
@@ -145,29 +132,7 @@ void SLM_AATCExperiment::loopMilliPre() {
     return;
   }
 
-#ifdef SLM_DEBUG
-  // Drive the simulated frame clock in place of the pin. The phase durations are
-  // counted in gather() ticks, so they are milliseconds only while gatherTimer
-  // stays at a 1000 us interval - the same assumption the select transmission
-  // below makes. The level is toggled before it is sampled, so the tick that
-  // flips the clock is also the tick that sees the edge.
-  if (++debug_frame_clock_tick >= (debug_frame_clock
-                                       ? debug_frame_clock_high_millis
-                                       : debug_frame_clock_low_millis)) {
-    debug_frame_clock_tick = 0;
-    debug_frame_clock = !debug_frame_clock;
-  }
-  digitalWriteFast(DEBUG_FRAME_CLOCK_OUT, debug_frame_clock);
-  const int slm_frame_clock = debug_frame_clock ? HIGH : LOW;
-  // write the status of slm_stim_armed to SLM_DEBUG_OUT
-  if (slm_stim_armed)
-    digitalWriteFast(SLM_DEBUG_OUT, HIGH);
-  else
-    digitalWriteFast(SLM_DEBUG_OUT, LOW);
-
-#else
   const int slm_frame_clock = digitalReadFast(SCANNER_FRAME_CLOCK);
-#endif
   switch (slm_select_phase) {
     case slmSelIdle:
       if (slm_stim_armed) {
@@ -233,9 +198,8 @@ void SLM_AATCExperiment::loopMilliPre() {
           slm_select_phase = slmSelIdle;
         }
         // Otherwise stay in slmSelDone, armed, waiting for the next edge. Arming
-        // is held for the whole train, so SLM_DEBUG_OUT reads high across it and
-        // a re-arm while a train is running is absorbed rather than restarting
-        // the select transmission mid-train.
+        // is held for the whole train, so a re-arm while a train is running is
+        // absorbed rather than restarting the select transmission mid-train.
       }
       break;
   }
@@ -257,11 +221,7 @@ void SLM_AATCExperiment::loopMilliPre() {
 
 void SLM_AATCExperiment::loopMilliPost() {
   Experiment::loopMilliPost(); // for lick detection logic
-#ifdef SLM_DEBUG
-  AATC_trigger = true;
-#else
   AATC_trigger = digitalReadFast(TRIGGER_AATC);
-#endif
 }
 
 void SLM_AATCExperiment::reset() {
@@ -279,17 +239,7 @@ void SLM_AATCExperiment::reset() {
   slm_stim_pulses_left = 0;
   slm_select_phase = slmSelIdle;
   slm_select_tick = 0;
-#ifdef SLM_DEBUG
-  // Restart the simulated clock from its low phase. The loop over pinsDigitalOut
-  // above has already driven DEBUG_FRAME_CLOCK_OUT low, so this keeps the
-  // variable and the pin in agreement instead of leaving the next tick to undo a
-  // forced level.
-  debug_frame_clock = false;
-  debug_frame_clock_tick = 0;
-  slm_frame_clock_prev = LOW;
-#else
   slm_frame_clock_prev = digitalReadFast(SCANNER_FRAME_CLOCK);
-#endif
 }
 
 // INVERTED SOUNDS, CS+ 9KHZ CS- 3KHZ
@@ -305,9 +255,6 @@ void SLM_AATCExperiment::AATC() {
     // Tone CS+
     if (slm_experiment) {
       slm_stim_armed = true;
-#ifdef SLM_DEBUG
-      slm_stim_selected++;
-#endif
     } else {
       analogWriteFrequency(SPEAKER, 9000);
       analogWrite(SPEAKER, 127);
@@ -316,11 +263,7 @@ void SLM_AATCExperiment::AATC() {
     rewardtime = triggertime + 3000;
     tonelength = triggertime + 2000;
 
-#ifdef SLM_DEBUG
-    triggertime = triggertime + 6000;
-#else
     triggertime = triggertime + random(29000, 45000);
-#endif
     n_sound1 += 1;
     n_sound2 = 0;
     Tone = random(2);
@@ -344,20 +287,13 @@ void SLM_AATCExperiment::AATC() {
     // Tone CS-
     if (slm_experiment) {
       slm_stim_armed = true;
-#ifdef SLM_DEBUG
-      slm_stim_selected++;
-#endif
     } else {
       tone(SPEAKER, 3000, 2000);
       digitalWriteFast(TONE2, HIGH);
     }
     tonelength = triggertime + 2000;
 
-#ifdef SLM_DEBUG
-    triggertime = triggertime + 6000;
-#else
     triggertime = triggertime + random(29000, 45000);
-#endif
     Tone = random(2);
     n_sound2 += 1;
     n_sound1 = 0;
@@ -371,11 +307,7 @@ void SLM_AATCExperiment::AATC() {
   }
 
   if (slm_experiment) {
-#ifdef SLM_DEBUG
-    if (slm_stim_selected >= 128) slm_stim_selected = 0;
-#else
     slm_stim_selected = Tone;
-#endif
   }
 }
 

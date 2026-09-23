@@ -30,8 +30,7 @@
 #define EXTSERIAL Serial1
 
 
-// Named pins. Included here rather than with the other headers because it
-// reads SLM_DEBUG.
+// Named pins, defined per experiment.
 #include <experiment_config.h>
 
 // Analog and digital channels scanned every gather tick
