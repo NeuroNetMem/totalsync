@@ -59,7 +59,8 @@ which only exist under the triple-serial USB type. Removing it will not compile.
 experiment-specific sits behind two files in `src/experiments/<name>/`:
 
 * **`experiment_config.h`** — the pin map. One `#define` per pin, saying what it is wired
-  to. The name must stay exactly `experiment_config.h`, because `main.cpp` includes it by
+  to, plus one `STATE_*` `#define` per state variable, naming it (see
+  [State variables](#state-variables)). The name must stay exactly `experiment_config.h`, because `main.cpp` includes it by
   that name and the build selects *which* one with an include path.
 * **a `.cpp`** — a subclass of `Experiment` (`src/Experiment.h`) plus a
   `makeExperiment()` factory that returns one.
@@ -120,6 +121,8 @@ The packet layout is fixed, and the arrays in `src/main.cpp` say which pads fill
 | `pinsDigitalOut` | 24–39             | 16 |
 | state variables | —                 | 8 |
 
+See [State variables](#state-variables) for what the 8 state slots hold.
+
 Pins 40 and 41 (`LOOP_INDICATOR`, `GATHER_INDICATOR`) are reserved: the firmware pulses
 them so the acquisition loop can be timed on a scope, and they never reach a packet.
 Pin 23 is wired to the header but not sampled by default.
@@ -136,6 +139,40 @@ Pins are assigned a function in the experiment_config.h file in the experiment d
 - connectivity with a Pi Camera is also implemented via `PIN_CAMERA_FSTROBE`, `PIN_SYNC_LED`
 - Synchronization with e.g. Neuropixels hardware or a two-photon microscope takes place via a random barcode signal that is output on pin `EPHYS_SYNC`. Two-photon synchronization additionally uses the `SCANNER_FRAME_CLOCK` from the microscope. {doc}`totalsync-2p` provides a way to realign TIFF files on the Totalsync timeline in a robust way.
 
+
+### State variables
+
+Besides the pins, every packet carries eight `long` state variables. They are written
+through the array `state_variables[]`, declared in `src/Experiment.h`: at the end of every
+`gather()` tick, after the experiment's `loopMilliPre()` and `loopMilliPost()` have run,
+the whole array is copied into the packet. Each slot is named by a `STATE_*` macro in
+`experiment_config.h`:
+
+| Slot | Macro | Filled by | Holds |
+| --- | --- | --- | --- |
+| 0 | `STATE_WHEEL_POS` | `main.cpp` | raw wheel encoder count |
+| 1 | `STATE_WHEEL_POS_SCALED` | `main.cpp` | encoder count × `EncoderConversion` |
+| 2 | `STATE_BINARY_LICK` | `main.cpp` | lick detector output, 0 / 1 |
+| 3 | `STATE_LICK` | `main.cpp` | lick counter |
+| 4–6 | `STATE_FREE_4` … `STATE_FREE_6` | the experiment | free |
+| 7 | `STATE_LAST_PACKET_TOOK` | `main.cpp` | duration of the previous `gather()`, µs |
+
+Slots 4–6 belong to the experiment. Give the ones you use a meaningful name in your
+`experiment_config.h` (say `#define STATE_TRIAL 4`) and write them from any `Experiment`
+method:
+
+```cpp
+state_variables[STATE_TRIAL] = trial_number;
+```
+
+A value stays in every packet until it is written again; `reset()` sets all slots back
+to zero before calling the experiment's own `reset()`. Anything written to slots 0–3 or 7
+is overwritten by `gather()` on the next tick. `main.cpp` refers to the fixed slots by
+their macros, so every `experiment_config.h` must define all eight names.
+
+The macro names end up in the pin sheet, which is how the decoder labels the state
+variables: `STATE_TRIAL` becomes the channel `trial` (see {doc}`totalsync-pinsheet`).
+Regenerate the sheet after renaming one.
 
 ### Provided examples
 
@@ -157,9 +194,10 @@ totalsync-pinout pinSheet.json -o pinout.png   # ...and draw it, to check the wi
 
 Naming the project directory rather than `src/main.cpp` is what lets
 {doc}`totalsync-pinsheet` read the include path and the defines out of `platformio.ini`.
-That matters: in `slm_aatc`, `-D SLM_DEBUG=1` is what names two of the output pins, so a
-sheet generated without it would describe a different build from the one you flashed. Use
-`--experiment` to pick the environment.
+That matters: the include path decides which `experiment_config.h` is read, and so which
+pin and state names end up in the sheet, and any `-D` in the environment's `build_flags`
+can change them further. A sheet generated without them could describe a different build
+from the one you flashed. Use `--experiment` to pick the environment.
 
 See {doc}`extending` for what else follows from a firmware change, and
 {doc}`totalsync-pinsheet` for the details of how the labels are derived.

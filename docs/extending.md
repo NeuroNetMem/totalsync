@@ -10,13 +10,14 @@ experiment under `firmware/src/experiments/`.
 
 1. create a firmware project stub with {doc}`totalsync-firmware`. Open it in your favorite editor or IDE (with platformio plugin).
 
-2. write your own pinout: add or modify PINs definitions by editing/adding preprocessor macro definitions (`#define`) in `your_experiment/experiment_config.h`
+2. write your own pinout: add or modify PINs definitions by editing/adding preprocessor macro definitions (`#define`) in `your_experiment/experiment_config.h`. The same file names the eight state variables with `STATE_*` macros: rename `STATE_FREE_4` … `STATE_FREE_6` for the slots your experiment uses (see {doc}`firmware`).
 
 3. write your own experiment logic as a subclass of `Experiment` in `your_experiment/your_experiment.cpp`. The `Experiment` API includes five entry points to the Teensy workflow:
 - `setup()` is run when the Teensy starts up and may be used for initialization, for example custom pin setups (eg. with a pull-up resistor). Initialization will depend on the state of the pins (and the attached devices) *at the time of Teensy startup* so care must be taken to avoid eg. switch-on order issues. In general, probably best to keep custom operations in here at a minimum
 - `reset()` is run when the Teensy is reset, for example by pressing the reset button. It is useful for resetting the state of the experiment, for example to clear a buffer or reset a counter.
 - `loopMicro()` is run in the Teensy main loop, which runs every microsecond. The loop (in `main.cpp`) is mostly used to control serial port communication and low-level synchronization tasks. Because of processing speed limitations, ti is best to keep custom operations in here at a minimum as well.
 - `loopMilliPre()` and `loopMilliPost()` are run in a Teensy timer loop, which runs every millisecond (and calls the function `gather()` in `main.cpp`). Here, the core of the experiment is implemented. Use data members in the experiment class to maintain information on the state of the experiment, for example counters that keep track of the duration of timed events. State of pins can be changed here, and this will be recorded in the output data and visualized in the GUI. `loopMilliPre()` runs in `gather()` before serial port operations and `loopMilliPost()` after it, enabling the user to choose their preferred timing behavior. These are the two functions that you will find yourself mostly working on.
+- values that are not pin states, such as a trial counter or the current stimulus, can be put on the data stream through the free state variables: `state_variables[STATE_TRIAL] = trial;` from any of the methods above. They are recorded with every packet, and named in the decoded data after their `STATE_*` macro.
 
 
 See {doc}`firmware` for the toolchain, the five methods an experiment implements, and how

@@ -27,7 +27,7 @@ namespace {
     bool slm_stim_ready = false;
     static constexpr int slm_stim_n_triggers = 3;
     static constexpr int slm_stim_duration = 10;
-    static constexpr int slm_stim_waittime = 10;
+    static constexpr int slm_stim_waittime = 1000;
     bool slm_stim_active = false; // trigger currently held high
     unsigned long slm_stim_end_millis = 0; // when to release the trigger
     int slm_frame_clock_prev = HIGH; // frame clock level on the last tick
@@ -346,6 +346,9 @@ void SLM_AATCExperiment::AATC() {
     }
     slm_stim_selected = Tone;
   }
+  state_variables[STATE_TONE] = Tone;
+  state_variables[STATE_N_TONE_1] = n_sound1;
+  state_variables[STATE_N_TONE_2] = n_sound2;
 }
 
 

@@ -65,12 +65,14 @@ settings on stderr, so it is both readable and pipeable:
 
 ```console
 $ totalsync-firmware list
-3 experiment(s) in .../totalsync_utils/data/firmware
-  slm_aatc               -D USB_TRIPLE_SERIAL -D SLM_DEBUG=1 -I src/experiments/slm_aatc
+4 experiment(s) in .../totalsync_utils/data/firmware
+  slm_aatc               -D USB_TRIPLE_SERIAL -I src/experiments/slm_aatc
   ofl_shock              -D USB_TRIPLE_SERIAL -I src/experiments/ofl_shock
+  widefield_generic      -D USB_TRIPLE_SERIAL -I src/experiments/widefield_generic
   template_experiment    -D USB_TRIPLE_SERIAL -I src/experiments/template_experiment
 slm_aatc
 ofl_shock
+widefield_generic
 template_experiment
 ```
 

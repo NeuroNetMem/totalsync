@@ -226,7 +226,10 @@ class FirmwarePinMap:
     arrays: dict = field(default_factory=dict)
     defines: list = field(default_factory=list)
     config_flags: set = field(default_factory=set)
+    #: ``{idx: name}`` guessed from the ``packet.variables[i] = x;`` assignments
     inferred_states: dict = field(default_factory=dict)
+    #: ``{idx: name}`` declared by the ``STATE_*`` macros
+    declared_states: dict = field(default_factory=dict)
     n_states: int = 0
     missing_includes: list = field(default_factory=list)
 
@@ -341,16 +344,13 @@ def parse_firmware(source, defines=(), undefines=(), include_dirs=(), exclude=()
                                      lineno=getattr(macro, 'lineno', 0) or 0))
     pin_defines.sort(key=lambda d: (d.lineno, d.name))
 
-    # Declared names win over those inferred from the assignments.
-    states = _infer_states(text, n_states)
-    states.update(declared_states)
-
     return FirmwarePinMap(
         path=source,
         arrays=arrays,
         defines=pin_defines,
         config_flags=flags,
-        inferred_states=states,
+        inferred_states=_infer_states(text, n_states),
+        declared_states=declared_states,
         n_states=n_states,
         missing_includes=missing,
     )
@@ -426,10 +426,38 @@ def _unique(label, taken, what):
     return unique
 
 
+def _resolve_states(firmware, states=None, existing_states=None, infer_states=True,
+                    prefer_existing=False):
+    """Name every state slot, as ``[(idx, name, source)]`` sorted by ``idx``.
+
+    Each slot takes its name from the highest-priority source that has one:
+    ``--state`` / ``states``, then the ``STATE_*`` macros, then an existing sheet
+    (``existing_states``), then the names guessed from the assignments.  Like the
+    pin labels, ``prefer_existing`` lets the existing sheet win over the macros.
+    """
+    layers = [('guessed', firmware.inferred_states if infer_states else {}),
+              ('merged', {s['idx']: s['name'] for s in existing_states or ()}),
+              ('macro', firmware.declared_states)]
+    if prefer_existing:
+        layers[1], layers[2] = layers[2], layers[1]
+    layers.append(('--state', {s['idx']: s['name'] for s in states or ()}))
+
+    resolved = {}
+    for source, names in layers:
+        for idx, name in names.items():
+            resolved[idx] = (name, source)
+    return [(idx, name, source) for idx, (name, source) in sorted(resolved.items())]
+
+
 def build_pin_sheet(firmware, title=None, updated=None, acronyms=DEFAULT_ACRONYMS,
                     existing=None, prefer_existing=False, states=None,
-                    infer_states=True):
-    """Build the pinSheet dictionary from a parsed :class:`FirmwarePinMap`."""
+                    existing_states=None, infer_states=True):
+    """Build the pinSheet dictionary from a parsed :class:`FirmwarePinMap`.
+
+    ``states`` (``[{'idx', 'name'}]``) overrides individual state names;
+    ``existing_states`` are those of a sheet being merged.  See
+    :func:`_resolve_states` for how they combine with the firmware's own names.
+    """
     unity_order = {pin: index for index, pin in enumerate(firmware.arrays.get(_UNITY_ARRAY, ()))}
     existing = existing or {}
     taken = set()
@@ -472,11 +500,9 @@ def build_pin_sheet(firmware, title=None, updated=None, acronyms=DEFAULT_ACRONYM
                 'for': label,
             })
 
-    if states is None:
-        states = [{'idx': idx, 'name': firmware.inferred_states[idx]}
-                  for idx in sorted(firmware.inferred_states)] if infer_states else []
-    for state in states:
-        state['name'] = _unique(state['name'], taken, 'state')
+    states = [{'idx': idx, 'name': _unique(name, taken, 'state')}
+              for idx, name, _source in _resolve_states(
+                  firmware, states, existing_states, infer_states, prefer_existing)]
 
     return {
         'title': title or f'Teensy-TotalSync pin information: {firmware.path.name}',
@@ -501,8 +527,6 @@ def generate_pin_sheet(source, defines=(), undefines=(), include_dirs=(), exclud
     existing, existing_title, existing_states = ({}, None, None)
     if merge:
         existing, existing_title, existing_states = _load_existing(merge)
-    if states is None and existing_states:
-        states = [dict(state) for state in existing_states]
     return build_pin_sheet(
         firmware,
         title=title or existing_title,
@@ -511,6 +535,7 @@ def generate_pin_sheet(source, defines=(), undefines=(), include_dirs=(), exclud
         existing=existing,
         prefer_existing=prefer_existing,
         states=states,
+        existing_states=existing_states,
         infer_states=infer_states,
     )
 
@@ -530,7 +555,7 @@ def _parse_state_option(value):
     return {'idx': index, 'name': name}
 
 
-def _describe(firmware, sheet, stream):
+def _describe(firmware, sheet, stream, state_sources=None):
     print(f'{firmware.path}', file=stream)
     if firmware.missing_includes:
         print(f'  headers not found (skipped): {", ".join(firmware.missing_includes)}', file=stream)
@@ -547,8 +572,11 @@ def _describe(firmware, sheet, stream):
         print(f'  {flag} {pin["name"]:<18} teensy {pin["teensy_pin"]:<3} '
               f'unity {"-" if pin["unity"] is None else pin["unity"]:<4} {pin["for"] or ""}',
               file=stream)
+    state_sources = state_sources or {}
     for state in sheet['states']:
-        print(f'  * state[{state["idx"]}]        {state["name"]}', file=stream)
+        source = state_sources.get(state['idx'])
+        print(f'  * state[{state["idx"]}]        {state["name"]}'
+              + (f'  ({source})' if source else ''), file=stream)
 
 
 def _resolve_source(args):
@@ -651,15 +679,19 @@ Examples:
     parser.add_argument('--title', help='Title field (default: derived from the source file name)')
     parser.add_argument('--updated', help='Updated field, YYYYMMDD (default: today)')
     parser.add_argument('--merge', metavar='PINSHEET',
-                        help='Existing pinSheet.json to take title, states and otherwise '
-                             'unknown "for" labels from')
+                        help='Existing pinSheet.json to take the title and otherwise '
+                             'unknown "for" labels and state names from')
     parser.add_argument('--prefer-existing', action='store_true',
-                        help='With --merge, let the existing labels win over the macro names')
+                        help='With --merge, let the existing labels and state names '
+                             'win over the macro names')
     parser.add_argument('--state', action='append', default=[], type=_parse_state_option,
                         metavar='IDX=NAME', help='Name of state vector slot IDX (repeatable). '
-                                                 'Overrides the names guessed from the source.')
+                                                 'Overrides the names read from the source '
+                                                 'and from --merge.')
     parser.add_argument('--no-infer-states', action='store_true',
-                        help='Do not guess state vector names from the source')
+                        help='Do not guess state vector names from the '
+                             'packet.variables[] assignments. Names declared with '
+                             'STATE_* macros are always used.')
     parser.add_argument('-q', '--quiet', action='store_true',
                         help='Do not print the summary of what was found')
     args = parser.parse_args(argv)
@@ -670,10 +702,9 @@ Examples:
 
     # A pin sheet is only right for one build configuration, and which pins are even
     # visible depends on the include path: main.cpp includes experiment_config.h, which
-    # lives inside one experiment's directory. Naming a PlatformIO project instead of a
-    # file lets platformio.ini answer both questions -- and for slm_aatc that matters for
-    # correctness, not just convenience, since its -D SLM_DEBUG=1 is what names two of
-    # the output pins.
+    # lives inside one experiment's directory and also names the state channels. Naming
+    # a PlatformIO project instead of a file lets platformio.ini answer both questions,
+    # since any -D in an environment's build_flags can change which pins get named.
     try:
         source, project, experiment = _resolve_source(args)
     except (OSError, ValueError) as exc:
@@ -716,8 +747,6 @@ Examples:
             print(f'Error reading {args.merge}: {exc}', file=sys.stderr)
             return 1
 
-    states = args.state or ([dict(s) for s in existing_states] if existing_states else None)
-
     sheet = build_pin_sheet(
         firmware,
         # Every experiment's main.cpp is called main.cpp, so a project derives its
@@ -728,7 +757,8 @@ Examples:
         acronyms=DEFAULT_ACRONYMS | {a.upper() for a in args.acronym},
         existing=existing,
         prefer_existing=args.prefer_existing,
-        states=states,
+        states=args.state,
+        existing_states=existing_states,
         infer_states=not args.no_infer_states,
     )
 
@@ -741,7 +771,10 @@ Examples:
             print(f'Wrote {args.output}', file=sys.stderr)
 
     if not args.quiet:
-        _describe(firmware, sheet, sys.stderr)
+        state_sources = {idx: source for idx, _name, source in _resolve_states(
+            firmware, args.state, existing_states, not args.no_infer_states,
+            args.prefer_existing)}
+        _describe(firmware, sheet, sys.stderr, state_sources)
 
     return 0
 

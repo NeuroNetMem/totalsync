@@ -31,10 +31,10 @@ totalsync-pinsheet [<source>] [--bundled] [--experiment NAME] [-o OUTPUT]
 | `--acronym WORD` | Extra word to keep upper case in labels. Repeatable. |
 | `--title TITLE` | `title` field (default: the experiment name for a project, otherwise the source file name) |
 | `--updated YYYYMMDD` | `updated` field (default: today) |
-| `--merge PINSHEET` | Existing sheet to take the title, states and otherwise unknown `for` labels from |
-| `--prefer-existing` | With `--merge`, let the existing labels win over the macro names |
-| `--state IDX=NAME` | Name of state vector slot `IDX`. Repeatable; overrides the guessed names. |
-| `--no-infer-states` | Do not guess state vector names from the source |
+| `--merge PINSHEET` | Existing sheet to take the title from, plus any `for` labels and state names the firmware does not provide |
+| `--prefer-existing` | With `--merge`, let the existing labels and state names win over the macro names |
+| `--state IDX=NAME` | Name of state vector slot `IDX`. Repeatable; wins over the `STATE_*` macros and `--merge`, one slot at a time. |
+| `--no-infer-states` | Do not guess state vector names from `packet.variables[]` assignments. Names declared with `STATE_*` macros are always used. |
 | `-q`, `--quiet` | Do not print the summary of what was found |
 
 ## What it reads
@@ -51,7 +51,10 @@ The `for` labels come from the `#define`s. A macro is read as a pin name when
 * it is an object-like macro whose body evaluates to an integer,
 * that integer appears in one of the arrays above, and
 * it is not a compile-time configuration flag, i.e. the preprocessor never
-  branches on it.
+  branches on it, and
+* its name does not start with `STATE_` — those name state channels (see
+  [State names](#state-names)), and their values 0–7 would otherwise be read as
+  digital input pins 0–7.
 
 The middle rule leaves out pins that never reach a packet, such as the
 `LOOP_INDICATOR 40` / `GATHER_INDICATOR 41` scope probes. The last one keeps
@@ -64,10 +67,39 @@ Macro names are decapitalised and underscores become spaces, so
 letters stay upper case, so `PIN_SYNC_LED` becomes `Pin Sync LED` and `TRIGGER_C`
 becomes `Trigger C`. Add your own with `--acronym`.
 
-State vector names are guessed from the `packet.variables[i] = <variable>;`
-assignments, since the firmware declares no names for them. Override them with
-`--state`, keep the ones from an existing sheet with `--merge`, or drop them with
-`--no-infer-states`.
+### State names
+
+The eight state variables of each packet are named by `STATE_*` macros in the
+experiment's `experiment_config.h`, next to the pin names:
+
+```c
+#define STATE_WHEEL_POS 0        // raw encoder count
+#define STATE_WHEEL_POS_SCALED 1 // count * EncoderConversion
+#define STATE_BINARY_LICK 2
+#define STATE_LICK 3
+#define STATE_FREE_4 4
+#define STATE_FREE_5 5
+#define STATE_FREE_6 6
+#define STATE_LAST_PACKET_TOOK 7 // duration of the previous gather(), us
+```
+
+Each becomes an entry of the sheet's `states` list: the value is the `idx`, and
+the name loses its `STATE_` prefix and is lower-cased, so `STATE_WHEEL_POS 0`
+becomes `{"idx": 0, "name": "wheel_pos"}`. See {doc}`firmware` for which channels
+an experiment may write.
+
+When several sources name the same slot, the highest one in this list wins:
+
+1. `--state IDX=NAME` on the command line;
+2. the `STATE_*` macros;
+3. the `states` of the sheet given with `--merge`;
+4. names guessed from `packet.variables[i] = <variable>;` assignments.
+
+`--prefer-existing` swaps 2 and 3, just as it lets merged `for` labels win over
+macro pin names. The guessing only matters for sources that declare no `STATE_*`
+macros, such as `docs/examples/main_example.cpp`; `--no-infer-states` turns it off.
+The summary printed on stderr tags each state with the source of its name
+(`--state`, `macro`, `merged` or `guessed`).
 
 ## Build configurations
 
@@ -93,9 +125,10 @@ Given a directory, the source is taken to be its `src/main.cpp` and the `-I` and
 read out of `platformio.ini` for the environment `--experiment` names (default
 `template_experiment`). That is more than a convenience: `main.cpp` includes
 `experiment_config.h`, which only exists inside one experiment's directory, so without the
-right include path *no* pins are named at all — and in `slm_aatc`, `-D SLM_DEBUG=1` is
-what names two of the output pins, so a sheet generated without it would describe a
-different build from the one PlatformIO produces.
+right include path *no* pins and no state channels are named at all. The `-D` flags in an
+environment's `build_flags` matter too: any macro the source branches on can change which
+pins are named, so a sheet generated without them could describe a different build from
+the one PlatformIO produces.
 
 Command-line `-D` and `-U` still win over `platformio.ini`, so a configuration can still
 be explored without editing anything.
@@ -143,5 +176,7 @@ sheet = generate_pin_sheet("firmware/src/main.cpp",
 ```
 
 `parse_firmware()` returns the raw `FirmwarePinMap` (pin arrays, pin `#define`s,
-configuration flags, guessed state names) if you want to inspect the firmware
-rather than build a sheet.
+configuration flags, and the state names declared by `STATE_*` macros and guessed
+from assignments, as `declared_states` and `inferred_states`) if you want to inspect
+the firmware rather than build a sheet. `build_pin_sheet()` and `generate_pin_sheet()`
+take `states` for per-slot overrides, like `--state`.

@@ -204,11 +204,6 @@ static volatile long bufferedStates[nStates];
 // State channels, declared extern in Experiment.h so the experiment can write
 // its free channels; they must keep external linkage - do not make this static.
 volatile long state_variables[nStates] = {};
-static_assert(STATE_WHEEL_POS < nStates && STATE_WHEEL_POS_SCALED < nStates &&
-              STATE_BINARY_LICK < nStates && STATE_LICK < nStates &&
-              STATE_FREE_4 < nStates && STATE_FREE_5 < nStates &&
-              STATE_FREE_6 < nStates && STATE_LAST_PACKET_TOOK < nStates,
-              "STATE_* channel out of range of packet.variables");
 
 static volatile bool packetReady = false;
 

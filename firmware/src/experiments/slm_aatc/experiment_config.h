@@ -48,9 +48,9 @@
 #define STATE_WHEEL_POS_SCALED 1 // count * EncoderConversion
 #define STATE_BINARY_LICK 2
 #define STATE_LICK 3
-#define STATE_FREE_4 4
-#define STATE_FREE_5 5
-#define STATE_FREE_6 6
+#define STATE_TONE 4
+#define STATE_N_TONE_1 5
+#define STATE_N_TONE_2 6
 #define STATE_LAST_PACKET_TOOK 7 // duration of the previous gather(), us
 
 Experiment *makeExperiment();

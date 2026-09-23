@@ -12,22 +12,24 @@ pio run -e template_experiment              # build
 pio run -e template_experiment -t upload    # build and flash the Teensy
 ```
 
-Three environments ship as examples, one per experiment:
+Four environments ship as examples, one per experiment:
 
 | Environment | What it is |
 | --- | --- |
 | `template_experiment` | A documented starting point: a rodent-VR pinout with no task logic |
 | `slm_aatc` | Spatial-light-modulator stimulation with an AATC trigger |
 | `ofl_shock` | Observational fear learning, with shock and pre-shock phases |
+| `widefield_generic` | Widefield imaging: two Basler cameras and alternating light sources |
 
-There is no `default_envs`, so a bare `pio run` builds all three.
+There is no `default_envs`, so a bare `pio run` builds all of them.
 
 ## Where the pin map lives
 
 `src/experiments/<env>/experiment_config.h` is the single place a pin is named. The
 sampled pins and their order are declared in `src/main.cpp` as `pinsAnalogIn`,
 `pinsDigitalIn` and `pinsDigitalOut`; the `#define`s in `experiment_config.h` say what
-each one is wired to.
+each one is wired to. The same header names the eight state variables with `STATE_*`
+macros; slots 4–6 are free for the experiment to write through `state_variables[]`.
 
 After changing either, regenerate the channel map that the recorder and the decoder use:
 
