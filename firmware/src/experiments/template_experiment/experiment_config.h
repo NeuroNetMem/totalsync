@@ -53,7 +53,7 @@
 #define PIN_SYNC_LED 38
 
 // Pins used to scope the communication / acquisition timing (for interaction between the Teensy and the webapp,
-// so cannot be used for anything else)
+// so cannot be used for anything else, do not touch anything below this line)
 #define LOOP_INDICATOR 40
 #define GATHER_INDICATOR 41
 
