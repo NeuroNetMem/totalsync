@@ -14,5 +14,5 @@ totalsync --pinsheet docs/pinSheet_2026.json
 totalsync -D                 # simulated Teensy, no hardware needed
 ```
 
-Needs `tkinter` for its startup dialogs, which is stdlib but not pip-installable — see
-the installation guide if your Python build lacks it.
+The control window is Qt, through `PySide6-Essentials`, which is installed from PyPI as
+a regular dependency. The live data view stays in the browser.

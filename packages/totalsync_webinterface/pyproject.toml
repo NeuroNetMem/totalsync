@@ -1,6 +1,6 @@
 [project]
 name = "totalsync-webinterface"
-version = "0.2.0"
+version = "0.3.0"
 description = "TotalSync acquisition: serial reader, live browser interface and recorder"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,6 +23,9 @@ dependencies = [
     "pyzmq",
     # On Linux/macOS `curses` is in the stdlib; only Windows needs the backport.
     'windows-curses ; platform_system == "Windows"',
+    # The control window. -Essentials is the QtWidgets/QtGui/QtCore subset of PySide6,
+    # without the add-on modules that make the full wheel several times larger.
+    "PySide6-Essentials>=6.8",
 ]
 
 [project.optional-dependencies]
@@ -30,9 +33,6 @@ extras = [
     "pyglet",
     "sounddevice",
 ]
-# NOTE: the GUI also needs `tkinter`, which is part of the stdlib but is *not*
-# pip-installable. It ships with the python.org and conda builds; with Homebrew
-# python you need `brew install python-tk`, on Debian/Ubuntu `apt install python3-tk`.
 # `picamera` is Raspberry Pi only and is imported behind a try/except in camera.py.
 
 [project.scripts]

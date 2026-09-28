@@ -8,10 +8,10 @@ Once TotalSync is [installed](installation.md), a session looks like this.
 totalsync --pinsheet docs/pinSheet_2026.json
 ```
 
-Pick the serial port in the startup window and press Play; TotalSync then asks where to
-write the session, and the browser interface opens on <http://localhost:8000> once the
-servers are up. Pass `-o DIR` to skip the directory dialog, or `--no-browser` to leave the
-browser alone. See the [`totalsync` reference](totalsync.md) for the other options.
+In the TotalSync window pick the serial port and the output directory and press Play; the
+browser interface opens on <http://localhost:8000> once the servers are up, and the status
+bar at the bottom of the window counts the packets as they arrive. Pass `-s PORT -o DIR` to
+start without waiting for Play, or `--no-browser` to leave the browser alone. See the [`totalsync` reference](totalsync.md) for the other options.
 
 ## 2. Decode
 

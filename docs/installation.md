@@ -25,13 +25,9 @@ It runs on Windows, macOS and Linux.
 ## Requirements
 
 * **Python 3.11 or newer.**
-* **Tkinter**, which the graphical dialogs of the `totalsync` command need — the
-  analysis commands do not. It is part of the Python standard library but is *not*
-  installable with `pip`, so it has to come from your Python build:
-  * Python installed by **uv**, from **python.org**, or from **conda** — already included.
-  * **Homebrew** Python (macOS) — `brew install python-tk`
-  * **Debian / Ubuntu** — `sudo apt install python3-tk`
-  * **Fedora** — `sudo dnf install python3-tkinter`
+* The control window of the `totalsync` command uses Qt through
+  [PySide6](https://doc.qt.io/qtforpython-6/), which is installed from PyPI along with
+  everything else — nothing to install separately.
 * A **Teensy** running the TotalSync firmware (see [Teensy firmware](firmware.md)).
   You can install and try the software without one — see the `-D` flag under
   [Running TotalSync](#running-totalsync).
@@ -215,8 +211,8 @@ Start it with:
 totalsync
 ```
 
-(or `uv run totalsync` from a source checkout). A startup window opens and asks which
-serial port the Teensy is on, and the ports it detected are listed in the terminal.
+(or `uv run totalsync` from a source checkout). The TotalSync window opens: pick the
+serial port the Teensy is on and the directory to record into, then press Play.
 
 To check the install without a Teensy attached:
 

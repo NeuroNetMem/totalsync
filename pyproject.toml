@@ -2,10 +2,10 @@
 #
 # `pip install totalsync` gets acquisition and analysis together; the three members are
 # also independently installable, so a machine that only decodes recordings can take
-# `totalsync-utils` on its own without pyserial, pyzmq or tkinter.
+# `totalsync-utils` on its own without pyserial, pyzmq or Qt.
 [project]
 name = "totalsync"
-version = "0.4.0"
+version = "0.5.0"
 description = "Teensy-based synchronization system for multi-modal neuroscience recordings"
 readme = "README.md"
 requires-python = ">=3.11"

@@ -12,7 +12,7 @@ class SerialDump:
     without a GUI and -- worse -- that the dialog appeared at whatever point in startup
     this object happened to be constructed, which was after the browser had already been
     pointed at a server that was not listening yet.  Choosing the directory is a job for
-    whoever is talking to the user; see ``choose_output_directory`` in teensy_commander.
+    whoever is talking to the user; see ``ControlWindow`` in control_window.
     """
 
     def __init__(self, output_dir):
