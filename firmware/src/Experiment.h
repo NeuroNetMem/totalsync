@@ -2,8 +2,8 @@
 // Created by Francesco Battaglia on 07/09/2026.
 //
 
-#ifndef TOTALSYNCAATC_EXPERIMENT_H
-#define TOTALSYNCAATC_EXPERIMENT_H
+#ifndef TOTALSYNC_EXPERIMENT_H
+#define TOTALSYNC_EXPERIMENT_H
 
 // State channels of the data packet, defined in main.cpp. gather() copies the
 // whole array into packet.variables[] every tick, after the experiment hooks
@@ -40,4 +40,4 @@ public:
     virtual void loopMilliPost(); // gets called in gather() after serial port and pin updates
     virtual void reset() = 0; // gets called in reset()
 };
-#endif //TOTALSYNCAATC_EXPERIMENT_H
+#endif //TOTALSYNC_EXPERIMENT_H

@@ -25,17 +25,17 @@
 #define LICKDETECT 26
 #define TONE1 27
 #define TONE2 28
-#define TRIGGER_AATC 29
-#define EXPER 30
-#define SHOCK 31
-
+#define SLM_STIM_1 29
+#define SLM_STIM_2 30
+#define AATC_REVERSAL 31
+#define SLM_REWARDED 32
 #define SLM_STIM_SELECT 33
 #define SLM_STIM_TRIGGER 34
-
+#define AATC_EXP_ON 35
 #define EPHYS_TRIGGER 36
 #define EPHYS_SYNC 37
 #define PIN_SYNC_LED 38
-#define TRIGGER_C 39
+#define SLM_STIMULATION 39
 
 // Pins used to scope the communication / acquisition timing
 #define LOOP_INDICATOR 40
