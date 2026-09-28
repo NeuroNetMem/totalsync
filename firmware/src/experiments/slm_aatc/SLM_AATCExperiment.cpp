@@ -66,9 +66,14 @@ namespace {
     int aatc_trigger = 0;
     int aatc_reversal = 0;
     int slm_rewarded = 0;
-    int n_sound1 = 0;
-    int n_sound2 = 0;
     int aatc_tone = 0;
+    // slm_experiment, latched when a trial is set up in AATCReady, so that a
+    // trial is ended in the same mode (SLM or tone) it was started in even if
+    // SLM_STIMULATION changes part way through.
+    bool aatc_slm_trial = false;
+    // slm_experiment as seen on the previous AATC() tick, to detect a toggle of
+    // SLM_STIMULATION, which ends the current trial.
+    bool slm_experiment_prev = false;
     int tone_rep_count[2] = {0,0};
     int tone_tot_count[2] = {0,0};
     int max_tone_reps = 2;
@@ -102,6 +107,7 @@ namespace {
     static void turnTone1On();
     static void turnTone2On();
     static void turnTonesOff();
+    static void releaseAATCOutputs();
   public:
     ~SLM_AATCExperiment() override = default;
     void setup() override; // gets called in setup()
@@ -113,7 +119,7 @@ namespace {
 }
 
 void SLM_AATCExperiment::setup() {
-    ;
+  // pinMode(SPEAKER, OUTPUT);
 }
 
 void SLM_AATCExperiment::loopMicro() {
@@ -246,20 +252,14 @@ void SLM_AATCExperiment::loopMilliPre() {
       slm_select_tick = 0;
     }
     slm_frame_clock_prev = LOW;
-    return;
+  } else {
+    slm_select_stim();
+    slm_trigger_stim();
   }
 
-  slm_select_stim();
-  slm_trigger_stim();
-
-  // the AATC logic
+  // the AATC logic runs in both modes: SLM stimulation or tones
   AATC();
-  // if (aatc_trigger == 1) {
-  //   AATC();
-  // } else {
-  //   press_test = 0;
-  //   triggertime = 1000;
-  // }
+
 }
 
 void SLM_AATCExperiment::loopMilliPost() {
@@ -288,7 +288,8 @@ void SLM_AATCExperiment::reset() {
   slm_stim_pulses_left = 0;
   slm_select_phase = slmSelIdle;
   aatc_phase = AATCIdle;
-  turnTonesOff();
+  aatc_slm_trial = false;
+  releaseAATCOutputs();
   slm_select_tick = 0;
   slm_frame_clock_prev = digitalReadFast(SCANNER_FRAME_CLOCK);
 }
@@ -308,7 +309,19 @@ void SLM_AATCExperiment::turnTone2On() {
 void SLM_AATCExperiment::turnTonesOff() {
   digitalWriteFast(TONE1, LOW);
   digitalWriteFast(TONE2, LOW);
+  // tone() runs on its own timer until its duration elapses, so stop it
+  // explicitly rather than rely on that duration matching tone_length.
+  noTone(SPEAKER);
   analogWrite(SPEAKER, 0);
+}
+
+// Release every output the AATC state machine may have left asserted: tones,
+// SLM CS indicators and the reward (which VALVE follows in gather()).
+void SLM_AATCExperiment::releaseAATCOutputs() {
+  turnTonesOff();
+  digitalWriteFast(SLM_STIM_1, LOW);
+  digitalWriteFast(SLM_STIM_2, LOW);
+  digitalWriteFast(REWARD, LOW);
 }
 
 void SLM_AATCExperiment::AATC() {
@@ -322,12 +335,23 @@ void SLM_AATCExperiment::AATC() {
 
   if (aatc_trigger == 0 && aatc_phase != AATCIdle)
     aatc_phase = AATCReset;
+  // Toggling SLM_STIMULATION ends the current trial and restarts the tone counts.
+  // AATCReset below cleans up on this same tick.
+  if (slm_experiment != slm_experiment_prev) {
+    slm_experiment_prev = slm_experiment;
+    tone_tot_count[0] = 0;
+    tone_tot_count[1] = 0;
+    if (aatc_phase != AATCIdle)
+      aatc_phase = AATCReset;
+  }
   switch (aatc_phase) {
     case AATCIdle:
       if (aatc_trigger == 1) {
-        aatc_phase = AATCArmed;
-        n_sound1 = 0;
-        n_sound2 = 0;
+        // Go through AATCReady so the first trial also picks its tone, sets up
+        // the stimulation and starts a fresh ITI.
+        aatc_phase = AATCReady;
+        tone_rep_count[0] = 0;
+        tone_rep_count[1] = 0;
       }
       break;
     case AATCReady:
@@ -341,7 +365,8 @@ void SLM_AATCExperiment::AATC() {
       tone_tot_count[aatc_tone]++;
 
       // set up stimulation
-      if (slm_experiment) {
+      aatc_slm_trial = slm_experiment;
+      if (aatc_slm_trial) {
         slm_stim_selected = aatc_tone + 1;
         slm_stim_armed = true;
         slm_fire_due = true;
@@ -355,8 +380,14 @@ void SLM_AATCExperiment::AATC() {
     case AATCArmed:
       if (current_millis > triggertime) {
         // ready to start the CS, whether a slm stimulation or a Tone
-        if (slm_experiment) {
+        if (aatc_slm_trial) {
           slm_stim_fire = true;
+          if (slm_stim_selected == 1) {
+            digitalWriteFast(SLM_STIM_1, HIGH);
+          } else {
+            digitalWriteFast(SLM_STIM_2, HIGH);
+          }
+
         }
         else {
           if (aatc_tone == 0) {
@@ -373,7 +404,10 @@ void SLM_AATCExperiment::AATC() {
     case AATCCSOn:
       if (current_millis > triggertime) {
         // terminate sound delivery if needed, go to trace
-        if (!slm_experiment) {
+        if (aatc_slm_trial) {
+          digitalWriteFast(SLM_STIM_1, LOW);
+          digitalWriteFast(SLM_STIM_2, LOW);
+        } else {
           turnTonesOff();
         }
         aatc_phase = AATCTrace;
@@ -384,7 +418,7 @@ void SLM_AATCExperiment::AATC() {
       if (current_millis > triggertime) {
         // when trace is concluded, turn on reward if appropriate
         aatc_phase = AATCReward;
-        if ((aatc_tone != aatc_reversal) && (!slm_experiment || slm_rewarded)) {
+        if ((aatc_tone != aatc_reversal) && (!aatc_slm_trial || slm_rewarded)) {
           digitalWriteFast(REWARD, HIGH);
         }
         triggertime = current_millis + reward_duration;
@@ -398,8 +432,9 @@ void SLM_AATCExperiment::AATC() {
       }
       break;
     case AATCReset:
-      turnTonesOff();
+      releaseAATCOutputs();
       slm_stim_armed = false;
+      slm_stim_fire = false;
       slm_fire_due = false;
       aatc_phase = AATCIdle;
       break;
@@ -410,91 +445,7 @@ void SLM_AATCExperiment::AATC() {
   state_variables[STATE_N_TONE_2] = tone_tot_count[1];
 }
 
-// INVERTED SOUNDS, CS+ 9KHZ CS- 3KHZ
-// void SLM_AATCExperiment::AATCold() {
-//   press_test++;
-//
-//   if (press_test == 1) {
-//     triggertime = triggertime + current_millis;
-//     n_sound1 = 0;
-//     n_sound2 = 0;
-//   }
-//
-//
-//   if ((current_millis >= triggertime) && (aatc_tone == 1) && (n_sound1 < 3)) {
-//     // Tone CS+
-//     if (slm_experiment) {
-//       slm_stim_selected =
-//       slm_stim_armed = true;
-//       slm_fire_due = true;
-//     } else {
-//       analogWriteFrequency(SPEAKER, 9000);
-//       analogWrite(SPEAKER, 127);
-//       digitalWriteFast(TONE1, HIGH);
-//     }
-//     rewardtime = triggertime + 3000;
-//     tone_length = triggertime + 2000;
-//
-//     triggertime = triggertime + random(iti_min, iti_max);
-//     n_sound1 += 1;
-//     n_sound2 = 0;
-//     aatc_tone = random(2);
-//
-//
-//
-//
-//     if (!slm_experiment && current_millis == tone_length) {
-//       digitalWriteFast(TONE1, LOW);
-//       digitalWriteFast(TONE2, LOW);
-//       analogWrite(SPEAKER, 0);
-//     }
-//     if (current_millis == rewardtime) {
-//       digitalWriteFast(REWARD, HIGH);
-//     }
-//     if (current_millis == rewardtime + 2000) {
-//       digitalWriteFast(REWARD, LOW);
-//     }
-//   }
-//   if ((current_millis >= triggertime) && (aatc_tone == 0) && (n_sound2 < 3)) {
-//     // Tone CS-
-//     if (slm_experiment) {
-//       slm_stim_armed = true;
-//       slm_fire_due = true;
-//     } else {
-//       aatc_tone(SPEAKER, 3000, 2000);
-//       digitalWriteFast(TONE2, HIGH);
-//     }
-//     tone_length = triggertime + 2000;
-//
-//     triggertime = triggertime + random(iti_min, iti_max);
-//     aatc_tone = random(2);
-//     n_sound2 += 1;
-//     n_sound1 = 0;
-//
-//   }
-//   if (n_sound1 >= 3) {
-//     aatc_tone = 0;
-//   }
-//   if (n_sound2 >= 3) {
-//     aatc_tone = 1;
-//   }
-//
-//   if (slm_experiment) {
-//     // Fire the stimulus selected this trial as soon as it is ready. On the tick
-//     // it is armed slm_stim_ready may still be set from the previous stimulus,
-//     // but slm_stim_armed is only consumed on the next tick, which also clears
-//     // slm_stim_ready; so slm_fire_due is held until the new selection and its
-//     // settling pause have completed.
-//     if (slm_fire_due && slm_stim_ready && !slm_stim_armed) {
-//       slm_stim_fire = true;
-//       slm_fire_due = false;
-//     }
-//     slm_stim_selected = aatc_tone;
-//   }
-//   state_variables[STATE_TONE] = aatc_tone;
-//   state_variables[STATE_N_TONE_1] = tone_tot_count[0];
-//   state_variables[STATE_N_TONE_2] = tone_tot_count[1];
-// }
+
 
 
 // generate the experiment object of the proper class, defined here

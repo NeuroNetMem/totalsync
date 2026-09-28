@@ -258,14 +258,10 @@ void setup() {
   for (int i : pinsAnalogIn) {
     pinMode(i, INPUT);
   }
-  // NOTE: no-op with the current pin table (nAnalogIn == 8)
-  for (int i = 8; i < nAnalogIn; i++) {
-    pinMode(pinsAnalogIn[i], OUTPUT);
-  }
 
   // Digital input channels (the last two are left untouched on purpose)
-  for (int i = 0; i < nDigitalIn - 2; i++) {
-    pinMode(pinsDigitalIn[i], INPUT);
+  for (int i : pinsDigitalIn) {
+    pinMode(i, INPUT);
   }
 
   // Digital output channels
