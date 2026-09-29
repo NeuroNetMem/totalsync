@@ -7,6 +7,13 @@
 #include "experiment_config.h"
 #include "Experiment.h"
 #include "PulsePin.h"
+
+// Uncomment (or add -D SIMULATED_FRAME_CLOCK to build_flags) to drive a simulated
+// 30 Hz scanner frame clock on SCANNER_FRAME_CLOCK, for bench tests and demos with
+// no microscope attached. Leave it off whenever a real frame clock is connected:
+// the pin is turned into an output and would fight the external signal.
+// #define SIMULATED_FRAME_CLOCK
+
 namespace {
   class SLM_AATCExperiment : public Experiment {
   private:
@@ -59,7 +66,8 @@ namespace {
     static constexpr uint8_t slmSelectDataBits = 8;
     slmSelectPhase slm_select_phase = slmSelIdle;
     AATCPhase aatc_phase = AATCIdle;
-    // Shared phase counter; uint16_t permits settling pauses up to 65,535 ms.
+    // Shared phase
+    // counter; uint16_t permits settling pauses up to 65,535 ms.
     uint16_t slm_select_tick = 0; // ticks elapsed in the current phase
     byte slm_select_byte = 0; // slm_stim_selected, latched at tx start
 
@@ -102,6 +110,7 @@ namespace {
 
     void slm_select_stim();
     void slm_trigger_stim();
+    static int frame_clock_level();
     void AATC();
 
     static void turnTone1On();
@@ -120,6 +129,23 @@ namespace {
 
 void SLM_AATCExperiment::setup() {
   // pinMode(SPEAKER, OUTPUT);
+#ifdef SIMULATED_FRAME_CLOCK
+  // main.cpp has already made it an input, along with the rest of pinsDigitalIn.
+  pinMode(SCANNER_FRAME_CLOCK, OUTPUT);
+#endif
+}
+
+// Level of the scanner frame clock on this tick. With SIMULATED_FRAME_CLOCK it is
+// a 30 Hz square wave derived from current_millis: HIGH for the first half of each
+// 1000/30 ms period, LOW for the second, so the falling edges come at 30 Hz on
+// average, 33 or 34 ms apart given the 1 ms tick. Reducing current_millis modulo
+// 1000 first keeps the product from overflowing.
+int SLM_AATCExperiment::frame_clock_level() {
+#ifdef SIMULATED_FRAME_CLOCK
+  return ((current_millis % 1000) * 30) % 1000 < 500 ? HIGH : LOW;
+#else
+  return digitalReadFast(SCANNER_FRAME_CLOCK);
+#endif
 }
 
 void SLM_AATCExperiment::loopMicro() {
@@ -203,7 +229,7 @@ void SLM_AATCExperiment::slm_select_stim() {
 // request is acted on from the next tick and the edge that starts the train is
 // always one sampled strictly after the request.
 void SLM_AATCExperiment::slm_trigger_stim() {
-  const int slm_frame_clock = digitalReadFast(SCANNER_FRAME_CLOCK);
+  const int slm_frame_clock = frame_clock_level();
 
   if (slm_stim_fire) {
     slm_stim_fire = false;
@@ -231,6 +257,11 @@ void SLM_AATCExperiment::slm_trigger_stim() {
 }
 
 void SLM_AATCExperiment::loopMilliPre() {
+#ifdef SIMULATED_FRAME_CLOCK
+  // Drive the simulated clock in both modes, before gather() samples the digital
+  // inputs, so it is recorded and can be scoped like the real one.
+  digitalWriteFast(SCANNER_FRAME_CLOCK, frame_clock_level());
+#endif
   if (!slm_experiment) {
     // Toggled off, possibly mid-stimulus: release both lines and drop anything
     // pending or in flight, so nothing is left asserted. The guard is false on
@@ -291,7 +322,7 @@ void SLM_AATCExperiment::reset() {
   aatc_slm_trial = false;
   releaseAATCOutputs();
   slm_select_tick = 0;
-  slm_frame_clock_prev = digitalReadFast(SCANNER_FRAME_CLOCK);
+  slm_frame_clock_prev = frame_clock_level();
 }
 
 
