@@ -82,6 +82,9 @@ namespace {
     // slm_experiment as seen on the previous AATC() tick, to detect a toggle of
     // SLM_STIMULATION, which ends the current trial.
     bool slm_experiment_prev = false;
+    // aatc_trigger as seen on the previous AATC() tick, to detect a toggle of
+    // AATC_EXP_ON, which restarts the tone counts.
+    int aatc_trigger_prev = 0;
     int tone_rep_count[2] = {0,0};
     int tone_tot_count[2] = {0,0};
     int max_tone_reps = 2;
@@ -366,6 +369,12 @@ void SLM_AATCExperiment::AATC() {
 
   if (aatc_trigger == 0 && aatc_phase != AATCIdle)
     aatc_phase = AATCReset;
+  // Toggling AATC_EXP_ON also restarts the tone counts.
+  if (aatc_trigger != aatc_trigger_prev) {
+    aatc_trigger_prev = aatc_trigger;
+    tone_tot_count[0] = 0;
+    tone_tot_count[1] = 0;
+  }
   // Toggling SLM_STIMULATION ends the current trial and restarts the tone counts.
   // AATCReset below cleans up on this same tick.
   if (slm_experiment != slm_experiment_prev) {
