@@ -5,4 +5,4 @@ Teensy's serial port and serves them to the browser interface in `web/`, which t
 package ships as package data (see `web_interface.WEB_DIRECTORY`).
 """
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'

@@ -93,7 +93,7 @@ html_theme = 'furo'
 html_title = f'TotalSync {version}'
 html_static_path = ['_static']
 html_theme_options = {
-    'source_repository': 'https://github.com/fpbattaglia/totalsync/',
+    'source_repository': 'https://github.com/NeuroNetMem/totalsync/',
     'source_branch': 'main',
     'source_directory': 'docs/',
 }

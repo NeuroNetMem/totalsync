@@ -43,3 +43,40 @@ and for what the fields mean.
 
 .. autofunction:: prettify_macro_name
 ```
+
+## Pin diagrams
+
+These draw a pin sheet onto a labelled picture of the Teensy 4.1; see
+{doc}`../totalsync-pinout` for the command-line front end and for how the artwork is
+measured.
+
+```{eval-rst}
+.. currentmodule:: totalsync_utils
+
+.. autofunction:: render_pinout
+.. autofunction:: detect_geometry
+```
+
+### Supporting types
+
+```{eval-rst}
+.. currentmodule:: totalsync_utils.pinout
+
+.. autoclass:: PinoutGeometry
+   :members:
+```
+
+## Firmware
+
+The Teensy firmware ships inside this package as a PlatformIO project template. These hand
+it out; see {doc}`../totalsync-firmware` for the command-line front end and
+{doc}`../firmware` for what the firmware itself does.
+
+```{eval-rst}
+.. currentmodule:: totalsync_utils
+
+.. autofunction:: scaffold_firmware
+.. autofunction:: bundled_firmware_path
+.. autofunction:: list_experiments
+.. autofunction:: experiment_build_settings
+```

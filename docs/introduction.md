@@ -25,7 +25,7 @@ This repository holds all the code needed to run TotalSync, and the use cases ab
 
 | | |
 | --- | --- |
-| **Firmware** | `Teensy41_Totalsync/` — the sketch that samples the pins and emits packets |
+| **Firmware** | `firmware/` — the PlatformIO project that samples the pins and emits packets |
 | **Recording** | The `totalsync` command reads those packets, writes a `.b64` session file, and serves the live interface above |
 | **Analysis** | `totalsync-decode` turns the session into numpy, MATLAB or [pynapple](https://pynapple.org) objects; `totalsync-2p` aligns it with two-photon imaging |
 | **Channel names** | A `pinSheet.json` maps pin positions to what they are wired to, and is used by both the interface and the decoder |

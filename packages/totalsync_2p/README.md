@@ -1,6 +1,6 @@
 # totalsync-2p
 
-Two-photon synchronization for [TotalSync](https://github.com/fpbattaglia/totalsync): aligns
+Two-photon synchronization for [TotalSync](https://github.com/NeuroNetMem/totalsync): aligns
 ScanImage `.tif` recordings with TotalSync behavioural telemetry, using the barcode
 signal where present and the frame clock otherwise.
 

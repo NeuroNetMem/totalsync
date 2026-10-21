@@ -29,6 +29,7 @@ import ast
 import datetime
 import io
 import json
+import os
 import re
 import sys
 import warnings
@@ -36,6 +37,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from pcpp import Action, OutputDirective, Preprocessor
+
+from .firmware import (DEFAULT_EXPERIMENT, bundled_firmware_path,
+                       experiment_build_settings, list_experiments)
 
 __all__ = [
     'FirmwarePinMap',
@@ -74,6 +78,8 @@ _SCALAR_RE = r'\b(?:const|constexpr|static)\s+(?:(?:unsigned|signed)\s+)?\w+\s+{
 _STATE_ASSIGN_RE = re.compile(
     r'\bpacket\s*\.\s*variables\s*\[\s*(\d+)\s*\]\s*=\s*([A-Za-z_]\w*)\s*;'
 )
+#: Prefix of the macros naming the state channels, in ``experiment_config.h``.
+_STATE_PREFIX = 'STATE_'
 _IFDEF_RE = re.compile(r'^[ \t]*#[ \t]*(?:ifdef|ifndef)[ \t]+(\w+)', re.M)
 _IF_RE = re.compile(r'^[ \t]*#[ \t]*(?:if|elif)\b([^\n]*(?:\\\n[^\n]*)*)', re.M)
 _IDENT_RE = re.compile(r'\b[A-Za-z_]\w*\b')
@@ -220,7 +226,10 @@ class FirmwarePinMap:
     arrays: dict = field(default_factory=dict)
     defines: list = field(default_factory=list)
     config_flags: set = field(default_factory=set)
+    #: ``{idx: name}`` guessed from the ``packet.variables[i] = x;`` assignments
     inferred_states: dict = field(default_factory=dict)
+    #: ``{idx: name}`` declared by the ``STATE_*`` macros
+    declared_states: dict = field(default_factory=dict)
     n_states: int = 0
     missing_includes: list = field(default_factory=list)
 
@@ -264,9 +273,9 @@ def _config_flags(raw_text):
 def _infer_states(text, n_states):
     """Best-effort state names, from ``packet.variables[i] = <identifier>;``.
 
-    The firmware has no declared names for the state vector, so this reads the
-    variable each slot is filled from.  A later assignment to the same slot wins,
-    matching what the compiled code does.
+    Fallback for firmware that does not name its state channels with ``STATE_*``
+    macros: this reads the variable each slot is filled from.  A later assignment
+    to the same slot wins, matching what the compiled code does.
     """
     states = {}
     for index, identifier in _STATE_ASSIGN_RE.findall(text):
@@ -312,13 +321,22 @@ def parse_firmware(source, defines=(), undefines=(), include_dirs=(), exclude=()
     # -D on the command line is a configuration choice by definition.
     flags = _config_flags(raw_text) | {d.split('=', 1)[0] for d in defines} | set(exclude)
 
+    n_states = _parse_scalar(text, 'nStates') or 0
+
     pin_defines = []
+    declared_states = {}
     for name, macro in macros.items():
         # Leading underscores mark identifiers reserved for the implementation:
         # __FILE__, pcpp's own __PCPP__, and anything a real toolchain predefines.
         if name.startswith('_') or name in flags or macro.arglist is not None:
             continue
         value = _eval_int(''.join(token.value for token in macro.value))
+        # STATE_* macros name state channels, not pins, though their values
+        # (0..nStates-1) coincide with digital input pin numbers.
+        if name.startswith(_STATE_PREFIX):
+            if value is not None and 0 <= value and (not n_states or value < n_states):
+                declared_states[value] = _snake_case(name[len(_STATE_PREFIX):])
+            continue
         if value is None or value not in known_pins:
             continue
         pin_defines.append(PinDefine(name=name, pin=value,
@@ -326,14 +344,13 @@ def parse_firmware(source, defines=(), undefines=(), include_dirs=(), exclude=()
                                      lineno=getattr(macro, 'lineno', 0) or 0))
     pin_defines.sort(key=lambda d: (d.lineno, d.name))
 
-    n_states = _parse_scalar(text, 'nStates') or 0
-
     return FirmwarePinMap(
         path=source,
         arrays=arrays,
         defines=pin_defines,
         config_flags=flags,
         inferred_states=_infer_states(text, n_states),
+        declared_states=declared_states,
         n_states=n_states,
         missing_includes=missing,
     )
@@ -409,10 +426,38 @@ def _unique(label, taken, what):
     return unique
 
 
+def _resolve_states(firmware, states=None, existing_states=None, infer_states=True,
+                    prefer_existing=False):
+    """Name every state slot, as ``[(idx, name, source)]`` sorted by ``idx``.
+
+    Each slot takes its name from the highest-priority source that has one:
+    ``--state`` / ``states``, then the ``STATE_*`` macros, then an existing sheet
+    (``existing_states``), then the names guessed from the assignments.  Like the
+    pin labels, ``prefer_existing`` lets the existing sheet win over the macros.
+    """
+    layers = [('guessed', firmware.inferred_states if infer_states else {}),
+              ('merged', {s['idx']: s['name'] for s in existing_states or ()}),
+              ('macro', firmware.declared_states)]
+    if prefer_existing:
+        layers[1], layers[2] = layers[2], layers[1]
+    layers.append(('--state', {s['idx']: s['name'] for s in states or ()}))
+
+    resolved = {}
+    for source, names in layers:
+        for idx, name in names.items():
+            resolved[idx] = (name, source)
+    return [(idx, name, source) for idx, (name, source) in sorted(resolved.items())]
+
+
 def build_pin_sheet(firmware, title=None, updated=None, acronyms=DEFAULT_ACRONYMS,
                     existing=None, prefer_existing=False, states=None,
-                    infer_states=True):
-    """Build the pinSheet dictionary from a parsed :class:`FirmwarePinMap`."""
+                    existing_states=None, infer_states=True):
+    """Build the pinSheet dictionary from a parsed :class:`FirmwarePinMap`.
+
+    ``states`` (``[{'idx', 'name'}]``) overrides individual state names;
+    ``existing_states`` are those of a sheet being merged.  See
+    :func:`_resolve_states` for how they combine with the firmware's own names.
+    """
     unity_order = {pin: index for index, pin in enumerate(firmware.arrays.get(_UNITY_ARRAY, ()))}
     existing = existing or {}
     taken = set()
@@ -455,11 +500,9 @@ def build_pin_sheet(firmware, title=None, updated=None, acronyms=DEFAULT_ACRONYM
                 'for': label,
             })
 
-    if states is None:
-        states = [{'idx': idx, 'name': firmware.inferred_states[idx]}
-                  for idx in sorted(firmware.inferred_states)] if infer_states else []
-    for state in states:
-        state['name'] = _unique(state['name'], taken, 'state')
+    states = [{'idx': idx, 'name': _unique(name, taken, 'state')}
+              for idx, name, _source in _resolve_states(
+                  firmware, states, existing_states, infer_states, prefer_existing)]
 
     return {
         'title': title or f'Teensy-TotalSync pin information: {firmware.path.name}',
@@ -484,8 +527,6 @@ def generate_pin_sheet(source, defines=(), undefines=(), include_dirs=(), exclud
     existing, existing_title, existing_states = ({}, None, None)
     if merge:
         existing, existing_title, existing_states = _load_existing(merge)
-    if states is None and existing_states:
-        states = [dict(state) for state in existing_states]
     return build_pin_sheet(
         firmware,
         title=title or existing_title,
@@ -494,6 +535,7 @@ def generate_pin_sheet(source, defines=(), undefines=(), include_dirs=(), exclud
         existing=existing,
         prefer_existing=prefer_existing,
         states=states,
+        existing_states=existing_states,
         infer_states=infer_states,
     )
 
@@ -513,7 +555,7 @@ def _parse_state_option(value):
     return {'idx': index, 'name': name}
 
 
-def _describe(firmware, sheet, stream):
+def _describe(firmware, sheet, stream, state_sources=None):
     print(f'{firmware.path}', file=stream)
     if firmware.missing_includes:
         print(f'  headers not found (skipped): {", ".join(firmware.missing_includes)}', file=stream)
@@ -530,8 +572,53 @@ def _describe(firmware, sheet, stream):
         print(f'  {flag} {pin["name"]:<18} teensy {pin["teensy_pin"]:<3} '
               f'unity {"-" if pin["unity"] is None else pin["unity"]:<4} {pin["for"] or ""}',
               file=stream)
+    state_sources = state_sources or {}
     for state in sheet['states']:
-        print(f'  * state[{state["idx"]}]        {state["name"]}', file=stream)
+        source = state_sources.get(state['idx'])
+        print(f'  * state[{state["idx"]}]        {state["name"]}'
+              + (f'  ({source})' if source else ''), file=stream)
+
+
+def _resolve_source(args):
+    """Work out what to preprocess, from ``source`` / ``--bundled`` / ``--experiment``.
+
+    Returns ``(source, project, experiment)``.  ``project`` is ``None`` when a plain file
+    was named, which is the original behaviour and takes no build settings from anywhere.
+    """
+    if args.bundled and args.source:
+        raise ValueError('give either a source or --bundled, not both')
+
+    project = None
+    source = None
+    if args.bundled:
+        project = bundled_firmware_path()
+    elif args.source is None:
+        raise ValueError('name a firmware source or a PlatformIO project, or use '
+                         '--bundled for the one shipped with this package')
+    else:
+        named = Path(args.source)
+        if named.is_dir():
+            project = named
+        elif named.is_file():
+            source = named
+        else:
+            raise FileNotFoundError(f'source not found: {named}')
+
+    if project is None:
+        if args.experiment:
+            raise ValueError('--experiment needs --bundled or a PlatformIO project '
+                             'directory, not a single source file')
+        return source, None, None
+
+    experiment = args.experiment or DEFAULT_EXPERIMENT
+    known = list_experiments(project)
+    if experiment not in known:
+        raise ValueError(f'no experiment {experiment!r} in {project / "platformio.ini"} '
+                         f'(have: {", ".join(known) or "none"})')
+    source = project / 'src' / 'main.cpp'
+    if not source.is_file():
+        raise FileNotFoundError(f'no src/main.cpp in {project}')
+    return source, project, experiment
 
 
 def main(argv=None):
@@ -542,8 +629,15 @@ def main(argv=None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Print the pin sheet for the configuration selected in the source
-  totalsync-pinsheet arduino/Teensy41_totalsync.ino
+  # Print the pin sheet for a PlatformIO project: platformio.ini supplies the
+  # include path and the -D flags of the chosen experiment
+  totalsync-pinsheet firmware --experiment slm_aatc
+
+  # ...or for the firmware bundled with this package, with no checkout at all
+  totalsync-pinsheet --bundled --experiment slm_aatc
+
+  # A single source file still works, if you supply the include path yourself
+  totalsync-pinsheet firmware/src/main.cpp -I firmware/src/experiments/slm_aatc
 
   # Write it out
   totalsync-pinsheet docs/main_example.cpp -o docs/pinSheet.json
@@ -556,7 +650,18 @@ Examples:
   totalsync-pinsheet docs/main_example.cpp --merge docs/pinSheet.json -o docs/pinSheet.json
         """,
     )
-    parser.add_argument('source', help='Teensy firmware source (.cpp / .ino)')
+    parser.add_argument('source', nargs='?',
+                        help='Teensy firmware source (.cpp / .ino), or a PlatformIO '
+                             'project directory, in which case the source and the '
+                             'build settings are read from its platformio.ini')
+    parser.add_argument('--bundled', action='store_true',
+                        help='Read the firmware bundled with this package instead of '
+                             'naming a source (see totalsync-firmware)')
+    parser.add_argument('--experiment', metavar='NAME',
+                        help='PlatformIO environment to generate the sheet for, which '
+                             'supplies the -I and -D from platformio.ini. Needs '
+                             '--bundled or a project directory. '
+                             f'Default: {DEFAULT_EXPERIMENT}')
     parser.add_argument('-o', '--output', default='-',
                         help='Output pinSheet.json ("-" for stdout, the default)')
     parser.add_argument('-D', '--define', action='append', default=[], metavar='NAME[=VALUE]',
@@ -574,15 +679,19 @@ Examples:
     parser.add_argument('--title', help='Title field (default: derived from the source file name)')
     parser.add_argument('--updated', help='Updated field, YYYYMMDD (default: today)')
     parser.add_argument('--merge', metavar='PINSHEET',
-                        help='Existing pinSheet.json to take title, states and otherwise '
-                             'unknown "for" labels from')
+                        help='Existing pinSheet.json to take the title and otherwise '
+                             'unknown "for" labels and state names from')
     parser.add_argument('--prefer-existing', action='store_true',
-                        help='With --merge, let the existing labels win over the macro names')
+                        help='With --merge, let the existing labels and state names '
+                             'win over the macro names')
     parser.add_argument('--state', action='append', default=[], type=_parse_state_option,
                         metavar='IDX=NAME', help='Name of state vector slot IDX (repeatable). '
-                                                 'Overrides the names guessed from the source.')
+                                                 'Overrides the names read from the source '
+                                                 'and from --merge.')
     parser.add_argument('--no-infer-states', action='store_true',
-                        help='Do not guess state vector names from the source')
+                        help='Do not guess state vector names from the '
+                             'packet.variables[] assignments. Names declared with '
+                             'STATE_* macros are always used.')
     parser.add_argument('-q', '--quiet', action='store_true',
                         help='Do not print the summary of what was found')
     args = parser.parse_args(argv)
@@ -591,17 +700,36 @@ Examples:
     # read better without the "file:line: UserWarning:" apparatus around them.
     warnings.showwarning = lambda message, *a, **k: print(f'warning: {message}', file=sys.stderr)
 
-    source = Path(args.source)
-    if not source.is_file():
-        print(f'Error: source file not found: {source}', file=sys.stderr)
+    # A pin sheet is only right for one build configuration, and which pins are even
+    # visible depends on the include path: main.cpp includes experiment_config.h, which
+    # lives inside one experiment's directory and also names the state channels. Naming
+    # a PlatformIO project instead of a file lets platformio.ini answer both questions,
+    # since any -D in an environment's build_flags can change which pins get named.
+    try:
+        source, project, experiment = _resolve_source(args)
+    except (OSError, ValueError) as exc:
+        print(f'Error: {exc}', file=sys.stderr)
         return 1
+
+    defines, include_dirs = list(args.define), list(args.include)
+    if project is not None:
+        ini_defines, ini_includes = experiment_build_settings(experiment, project)
+        # Prepended, so that a -D on the command line still wins: _preprocess applies
+        # defines in order, and undefines after all of them.
+        defines = ini_defines + defines
+        include_dirs = ini_includes + include_dirs
+        if not args.quiet:
+            flags = ' '.join([f'-D {d}' for d in ini_defines]
+                             + [f'-I {os.path.relpath(i, project)}' for i in ini_includes])
+            print(f'platformio env {experiment} in {project} ({flags})', file=sys.stderr)
+
     if args.merge and not Path(args.merge).is_file():
         print(f'Error: pin sheet to merge not found: {args.merge}', file=sys.stderr)
         return 1
 
     try:
-        firmware = parse_firmware(source, defines=args.define, undefines=args.undef,
-                                  include_dirs=args.include, exclude=args.exclude)
+        firmware = parse_firmware(source, defines=defines, undefines=args.undef,
+                                  include_dirs=include_dirs, exclude=args.exclude)
     except Exception as exc:
         print(f'Error parsing {source}: {exc}', file=sys.stderr)
         return 1
@@ -619,16 +747,18 @@ Examples:
             print(f'Error reading {args.merge}: {exc}', file=sys.stderr)
             return 1
 
-    states = args.state or ([dict(s) for s in existing_states] if existing_states else None)
-
     sheet = build_pin_sheet(
         firmware,
-        title=args.title or existing_title,
+        # Every experiment's main.cpp is called main.cpp, so a project derives its
+        # title from the environment instead.
+        title=args.title or existing_title or (
+            f'Teensy-TotalSync pin information: {experiment}' if project else None),
         updated=args.updated,
         acronyms=DEFAULT_ACRONYMS | {a.upper() for a in args.acronym},
         existing=existing,
         prefer_existing=args.prefer_existing,
-        states=states,
+        states=args.state,
+        existing_states=existing_states,
         infer_states=not args.no_infer_states,
     )
 
@@ -641,7 +771,10 @@ Examples:
             print(f'Wrote {args.output}', file=sys.stderr)
 
     if not args.quiet:
-        _describe(firmware, sheet, sys.stderr)
+        state_sources = {idx: source for idx, _name, source in _resolve_states(
+            firmware, args.state, existing_states, not args.no_infer_states,
+            args.prefer_existing)}
+        _describe(firmware, sheet, sys.stderr, state_sources)
 
     return 0
 

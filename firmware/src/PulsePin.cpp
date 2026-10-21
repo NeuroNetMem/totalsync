@@ -58,3 +58,4 @@ void PulsePin::stop() {
 int PulsePin::getId() {
   return this->pinID;
 }
+

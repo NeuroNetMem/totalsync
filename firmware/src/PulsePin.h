@@ -35,4 +35,5 @@ class PulsePin {
 
     int getId();
 };
+
 #endif

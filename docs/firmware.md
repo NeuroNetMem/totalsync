@@ -1,0 +1,203 @@
+# Teensy firmware
+
+The Teensy 4.1 is what actually samples the rig: 8 analog and 32 digital channels plus
+8 state variables, every millisecond, emitted as COBS-framed packets over USB serial.
+The firmware is a [PlatformIO](https://platformio.org) project, and it is meant to be
+modified — which pins are sampled and what they are wired to *is* the experiment.
+
+## Getting the project
+
+If you installed TotalSync from PyPI, the firmware came with it. Copy it out to a
+directory of your own:
+
+```bash
+totalsync-firmware init my-rig
+cd my-rig
+```
+
+That gives you a complete PlatformIO project you own and can commit — see
+{doc}`totalsync-firmware`. If you work from a checkout of the repository instead, it is
+already there, in `firmware/`.
+
+Either way, nothing else needs fetching: PlatformIO downloads the toolchain and the three
+libraries (`Encoder`, `FastCRC`, `PacketSerial`) on the first build.
+
+## Building and flashing
+
+Install PlatformIO — either the [CLI](https://docs.platformio.org/en/latest/core/installation/)
+(`pip install platformio`) or the plugin for CLion or VS Code, which reads
+`platformio.ini` directly.
+
+```bash
+pio run -e my_rig              # build (replace my_rig with the name of your experiment)
+pio run -e my_rig -t upload    # build and flash the Teensy
+```
+
+`upload_protocol = teensy-cli` means flashing goes through the Teensy Loader, so the
+board needs to be plugged in and, the first time, may need its program button pressed.
+
+Four environments ship as examples, one per experiment:
+
+| Environment | What it is |
+| --- | --- |
+| `template_experiment` | A documented starting point: a rodent-VR pinout with no task logic |
+| `slm_aatc` | Spatial-light-modulator stimulation with an AATC trigger |
+| `ofl_shock` | Observational fear learning, with shock and pre-shock phases |
+| `widefield_generic` | A generic widefield rig, with no task logic |
+
+There is no `default_envs`, so a bare `pio run` builds all four.
+
+:::{note}
+`-D USB_TRIPLE_SERIAL` in the shared `[env]` section is required, not a preference:
+`main.cpp` drives `packetSerialA` and `packetSerialB` on `SerialUSB1` / `SerialUSB2`,
+which only exist under the triple-serial USB type. Removing it will not compile.
+:::
+
+## What an experiment is
+
+`src/main.cpp` owns the acquisition loop and should never need editing. Everything
+experiment-specific sits behind two files in `src/experiments/<name>/`:
+
+* **`experiment_config.h`** — the pin map. One `#define` per pin, saying what it is wired
+  to, plus one `STATE_*` `#define` per state variable, naming it (see
+  [State variables](#state-variables)). The name must stay exactly `experiment_config.h`, because `main.cpp` includes it by
+  that name and the build selects *which* one with an include path.
+* **a `.cpp`** — a subclass of `Experiment` (`src/Experiment.h`) plus a
+  `makeExperiment()` factory that returns one.
+
+`Experiment` is five virtual methods, all `void method()`, with state kept in
+private members:
+
+| Method | When it runs |
+| --- | --- |
+| `setup()` | Once, from `setup()`, at power-on. Hardware initialised here must already be powered. |
+| `loopMicro()` | Every microsecond, from `loop()`. For timing-sensitive hardware only — keep it light. |
+| `loopMilliPre()` | Every millisecond, before the serial and pin update |
+| `loopMilliPost()` | Every millisecond, after it. Most task logic belongs here. |
+| `reset()` | On a reset command |
+
+The class goes in an anonymous namespace, private to its file; `makeExperiment()` is the
+only symbol the rest of the firmware links against.
+
+## Adding your own experiment
+
+The quick way:
+
+```bash
+totalsync-firmware init my-rig --experiment my_task
+```
+
+That copies the template experiment to `src/experiments/my_task/`, renames the class, and
+adds a matching `[env:my_task]` to `platformio.ini`. Then edit
+`src/experiments/my_task/experiment_config.h` for your wiring and put the task logic in
+`MyTaskExperiment`.
+
+By hand, in an existing project, it is three steps:
+
+1. Copy `src/experiments/template_experiment/` to `src/experiments/my_task/`.
+2. Rename the class in the `.cpp` (cosmetic, but three classes called
+   `TemplateExperiment` in one tree gets confusing). Keep `experiment_config.h` named
+   exactly that.
+3. Add an environment to `platformio.ini`:
+
+   ```ini
+   [env:my_task]
+   build_src_filter = +<*> -<experiments/> +<experiments/my_task/>
+   build_flags = ${env.build_flags} -I src/experiments/my_task
+   ```
+
+The `build_src_filter` is what keeps the other experiments out of the build. Without it
+every `makeExperiment()` in the tree is compiled and the link fails on a duplicate
+symbol; the `-I` is what makes your `experiment_config.h` the one `main.cpp` finds.
+
+## The pin budget
+
+The packet layout is fixed, and the arrays in `src/main.cpp` say which pads fill it:
+
+| | Pins              | Slots in the packet |
+| --- |-------------------| --- |
+| `pinsAnalogIn` | 16–23  | 8 |
+| `pinsDigitalIn` | 0–15              | 16 |
+| `pinsDigitalOut` | 24–39             | 16 |
+| state variables | —                 | 8 |
+
+See [State variables](#state-variables) for what the 8 state slots hold.
+
+Pins 40 and 41 (`LOOP_INDICATOR`, `GATHER_INDICATOR`) are reserved: the firmware pulses
+them so the acquisition loop can be timed on a scope, and they never reach a packet.
+Pin 23 is wired to the header but not sampled by default.
+
+`pinsDigital` is a separate array — the addressing order the `instUNITY` instruction
+indexes, which is what gives each digital channel its `unity` number. A digital pin
+missing from it cannot be addressed from Unity.
+
+Pins are assigned a function in the experiment_config.h file in the experiment directory, by way of preprocessor macros. The pins defined in `template_experiment/experiment_config.h` are used for basic functionalities that are implemented in main.cpp. This includes common elements of virtual reality neuroscience experiments: for example
+
+- a liquid reward electrovalve is controlled by pin `VALVE`. Its state can also be controlled externally, by Unity, from the Totalsync GUI or from the logic in the experiment class via the pin `REWARD`.
+- A wheel rotary encoder is controlled via the pins `WHEEL_ENC_PINA` and `WHEEL_ENC_PINB`. As the encoder ticks to displacement conversion depends on the encoder model and the overall setup configuration, the conversion factor has to be provided in the experiment class (`experiment->EncoderConversion`).
+- a standard implementation of lick detection for a IR sensor is provided, taking input from the sensor pin `LICK` and reporting the state via the pin `LICKDETECT`. This implementation may be overridden in the experiment class.
+- connectivity with a Pi Camera is also implemented via `PIN_CAMERA_FSTROBE`, `PIN_SYNC_LED`
+- Synchronization with e.g. Neuropixels hardware or a two-photon microscope takes place via a random barcode signal that is output on pin `EPHYS_SYNC`. Two-photon synchronization additionally uses the `SCANNER_FRAME_CLOCK` from the microscope. {doc}`totalsync-2p` provides a way to realign TIFF files on the Totalsync timeline in a robust way.
+
+
+### State variables
+
+Besides the pins, every packet carries eight `long` state variables. They are written
+through the array `state_variables[]`, declared in `src/Experiment.h`: at the end of every
+`gather()` tick, after the experiment's `loopMilliPre()` and `loopMilliPost()` have run,
+the whole array is copied into the packet. Each slot is named by a `STATE_*` macro in
+`experiment_config.h`:
+
+| Slot | Macro | Filled by | Holds |
+| --- | --- | --- | --- |
+| 0 | `STATE_WHEEL_POS` | `main.cpp` | raw wheel encoder count |
+| 1 | `STATE_WHEEL_POS_SCALED` | `main.cpp` | encoder count × `EncoderConversion` |
+| 2 | `STATE_BINARY_LICK` | `main.cpp` | lick detector output, 0 / 1 |
+| 3 | `STATE_LICK` | `main.cpp` | lick counter |
+| 4–6 | `STATE_FREE_4` … `STATE_FREE_6` | the experiment | free |
+| 7 | `STATE_LAST_PACKET_TOOK` | `main.cpp` | duration of the previous `gather()`, µs |
+
+Slots 4–6 belong to the experiment. Give the ones you use a meaningful name in your
+`experiment_config.h` (say `#define STATE_TRIAL 4`) and write them from any `Experiment`
+method:
+
+```cpp
+state_variables[STATE_TRIAL] = trial_number;
+```
+
+A value stays in every packet until it is written again; `reset()` sets all slots back
+to zero before calling the experiment's own `reset()`. Anything written to slots 0–3 or 7
+is overwritten by `gather()` on the next tick. `main.cpp` refers to the fixed slots by
+their macros, so every `experiment_config.h` must define all eight names.
+
+The macro names end up in the pin sheet, which is how the decoder labels the state
+variables: `STATE_TRIAL` becomes the channel `trial` (see {doc}`totalsync-pinsheet`).
+Regenerate the sheet after renaming one.
+
+### Provided examples
+
+- `slm-aatc` includes code for controlling a SLM optogenetic stimulator in scanimage, generating triggers timed on the imaging scanner flyback (to avoid light contamination in the imaging) and using a 1-wire serial protocol to communicate to scanimage which stimulation pattern must be emitted
+- `ofl-shock` includes code for fear conditioning experiments
+- `widefield-generic` includes code for controlling frame acquisition from two Basler cameras, enabling ratiometric imaging. In addition, it controls alternate activation of light sources for simultaneous fluorescence and reflectance imaging.
+- `template_experiment` is a reference implementation, only including the basic features discussed above (which are not part of the experiment class)
+
+## After a firmware change
+
+The channel names the recorder and the decoder use come from a `pinSheet.json`, and it is
+generated from the firmware rather than maintained by hand, so the names cannot drift away
+from the code that produces the data:
+
+```bash
+totalsync-pinsheet . -o pinSheet.json          # reads platformio.ini for the -I and -D
+totalsync-pinout pinSheet.json -o pinout.png   # ...and draw it, to check the wiring
+```
+
+Naming the project directory rather than `src/main.cpp` is what lets
+{doc}`totalsync-pinsheet` read the include path and the defines out of `platformio.ini`.
+That matters: the include path decides which `experiment_config.h` is read, and so which
+pin and state names end up in the sheet, and any `-D` in the environment's `build_flags`
+can change them further. A sheet generated without them could describe a different build
+from the one you flashed. Use `--experiment` to pick the environment.
+
+See {doc}`extending` for what else follows from a firmware change, and
+{doc}`totalsync-pinsheet` for the details of how the labels are derived.

@@ -96,3 +96,8 @@ call if you need them.
 
 * [totalsync-decode](totalsync-decode.md) — decode `.b64` files without the imaging side.
 * [totalsync-pinsheet](totalsync-pinsheet.md) — generate the pin sheet this tool needs.
+
+
+## Further steps
+
+the `frames_time_idx.npz` files include the alignment information. the results of two-photon data preprocessing may be automatically aligned on that timeline by using the [batch2p](https://github.com/NeuroNetMem/batch2p/tree/main) pipeline.

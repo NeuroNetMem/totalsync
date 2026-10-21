@@ -1,15 +1,15 @@
 import argparse
 import logging
+import os
+import signal
 import sys
 import threading
 import time
-import tkinter as tk
 import webbrowser
-from tkinter import messagebox as mb
+from pathlib import Path
 
 import serial
 import serial.threaded
-import serial.tools.list_ports
 import zmq
 
 try:
@@ -42,127 +42,38 @@ def open_web_interface():
     webbrowser.open_new(f'{WEB_URL}?t={time.time_ns():x}')
 
 
-# Fallback when neither --serial_port nor the startup dialog supplies a port. There is
+# Fallback when neither --serial_port nor the control window supplies a port. There is
 # no useful cross-platform default: on POSIX the devices are /dev/cu.* or /dev/ttyUSB*
 # and differ per machine, so fall back to an empty string and let the SerialException
-# handler in TeensyCommander report it (or use -D to switch to the dummy).
+# SerialPortError from TeensyCommander report it (or use -D to switch to the dummy).
 DEFAULT_SERIAL_PORT = 'COM9' if sys.platform == 'win32' else ''
 
-_root = None
+
+class SerialPortError(Exception):
+    """The serial port could not be opened (and -D did not ask for the dummy instead)."""
 
 
-def get_root():
-    """Return the process-wide hidden Tk root, creating it on first use.
+def prepare_output_directory(directory):
+    """Make ``directory`` usable as a recording target, or raise ValueError saying why.
 
-    Tk supports exactly one root per process. Additional tk.Tk() instances are
-    separate Tcl interpreters that cannot share variables or `after` callbacks,
-    and destroying one on macOS leaves a dangling Aqua idle handler that
-    segfaults the next event loop. Every window below is a Toplevel of this root.
+    Called before the serial port and the servers come up, so that a bad path is reported
+    while nothing is running yet rather than by the first packet failing to be written.
     """
-    global _root
-    if _root is None:
-        _root = tk.Tk()
-        _root.withdraw()
-    return _root
-
-
-def destroy_root():
-    """Tear down the Tk root so the process can exit without a stuck NSApplication."""
-    global _root
-    if _root is None:
-        return
+    directory = Path(directory).expanduser()
+    if directory.exists() and not directory.is_dir():
+        raise ValueError(f'not a directory: {directory}')
     try:
-        # update() first: it drains the idle queue. On macOS a Tk idle handler
-        # left unserviced across a destroy() segfaults the next event loop.
-        _root.update()
-        _root.destroy()
-    except tk.TclError:
-        pass
-    _root = None
-
-
-# sys.exit() must never be called from inside a Tk callback: the SystemExit it
-# raises is discarded by `tkwait` (unlike mainloop(), Tkapp_Call does not restore
-# the pending exception), so the caller silently carries on. The dialogs below
-# therefore report "the user asked to quit" through their return value instead.
-QUIT = object()
-
-
-def choose_serial_port(parent):
-    """Modal dialog to pick a serial port. Returns the device, or '' if cancelled."""
-    ports = sorted(comport.device for comport in serial.tools.list_ports.comports())
-    if not ports:
-        mb.showwarning('No serial ports', 'No serial ports were found on this machine.',
-                       parent=parent)
-        return ''
-
-    win = tk.Toplevel(parent)
-    win.title('Select the serial port you want to use')
-    win.geometry('500x40')
-    win.transient(parent)
-
-    selected = tk.StringVar(win)
-    chosen = []
-
-    def choice(value):
-        chosen.append(value)
-        win.destroy()
-
-    tk.OptionMenu(win, selected, *ports, command=choice).pack()
-    win.grab_set()
-    win.wait_window()
-    return chosen[0] if chosen else ''
-
-
-def welcome_dialog():
-    """Show the startup window.
-
-    Returns the serial port the user picked ('' if none), or QUIT if the user
-    asked to quit.
-    """
-    win = tk.Toplevel(get_root())
-    win.title('Totalsync')
-    win.geometry('400x150')
-    port = tk.StringVar(win)
-    quitting = []
-
-    def on_play():
-        # The HTTP server is not running yet; the 'Reload' button on the next
-        # window exists to retry once it is.
-        open_web_interface()
-        win.destroy()
-
-    def on_quit():
-        if mb.askyesno('Verify', 'Really quit?', parent=win):
-            quitting.append(True)
-            win.destroy()
-            return
-        mb.showinfo('No', 'Quit has been cancelled', parent=win)
-
-    def on_close():
-        if mb.askokcancel('Quit', 'Do you want to quit?', parent=win):
-            quitting.append(True)
-            win.destroy()
-
-    def on_choose():
-        device = choose_serial_port(win)
-        if device:
-            port.set(device)
-            logging.info(f'Selected serial port: {device}')
-
-    win.protocol('WM_DELETE_WINDOW', on_close)
-    tk.Label(win, text='Welcome to TotalSync').pack()
-    tk.Button(win, text='Quit', command=on_quit).pack()
-    tk.Button(win, text='Play', command=on_play).pack()
-    tk.Button(win, text='choose COM', command=on_choose).pack()
-
-    win.wait_window()
-    return QUIT if quitting else port.get()
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ValueError(f'cannot create {directory}: {exc}') from None
+    if not os.access(directory, os.W_OK):
+        raise ValueError(f'not writable: {directory}')
+    return directory
 
 
 class TeensyCommander:
-    def __init__(self, serial_port, http_port, ws_port, curses_screen, write_bin=False, use_dummy=False,
-                 channel_labels=None):
+    def __init__(self, serial_port, http_port, ws_port, curses_screen, output_dir,
+                 write_bin=False, use_dummy=False, channel_labels=None):
         self.n_packet = 0
         self.packets_per_second = 0
         self.packet_timings = []
@@ -171,35 +82,45 @@ class TeensyCommander:
         self.serial_reader = None
         self.reader_thread = None
         self.dummy = None
-        self.zmq_ctx = zmq.Context()
-        self.zmq_pub = self.zmq_ctx.socket(zmq.PUB)
-        self.zmq_pub.bind(f'tcp://*:{ZMQ_SERVER_PUB_PORT}')
-
-        self.zmq_sub = self.zmq_ctx.socket(zmq.SUB)
-        self.zmq_sub.setsockopt_string(zmq.SUBSCRIBE, "")
-        self.zmq_sub.bind(f'tcp://*:{ZMQ_SERVER_SUB_PORT}')
-
+        self.zmq_ctx = None
         self.alive = True
-        self.shell_gui = CursesUI(self, curses_screen) if curses_screen is not None else None
-        time.sleep(0.05)  # give some time to let log display catch all startup messages
-
-        self.serial_dump = SerialDump()
         self.serial_port = serial_port
-        self.web_server = WebInterface(http_port, ws_port, self, channel_labels=channel_labels)
 
+        # The serial port first, before anything binds a network port. This is the step
+        # the user can get wrong, and the control window lets them pick another port and
+        # press Play again - which would fail with "address already in use" if the HTTP,
+        # WebSocket and ZMQ servers of the failed attempt were still holding their ports.
         try:
             self.serial = serial.Serial(self.serial_port)
             self.serial.flushInput()
         except serial.SerialException as e:
             logging.error("Can't find serial device: {}".format(e))
-            if use_dummy:
-                logging.warning('Using serial dummy')
-                self.dummy = SerialDummy()
-                self.serial = self.dummy.ser
-                self.serial_port = 'DUMMY'
-            else:
-                self.shutdown()
-                raise SystemExit(1)
+            if not use_dummy:
+                raise SerialPortError(f"Can't open serial port {self.serial_port!r}: {e}") from None
+            logging.warning('Using serial dummy')
+            self.dummy = SerialDummy()
+            self.serial = self.dummy.ser
+            self.serial_port = 'DUMMY'
+
+        try:
+            self.zmq_ctx = zmq.Context()
+            self.zmq_pub = self.zmq_ctx.socket(zmq.PUB)
+            self.zmq_pub.bind(f'tcp://*:{ZMQ_SERVER_PUB_PORT}')
+
+            self.zmq_sub = self.zmq_ctx.socket(zmq.SUB)
+            self.zmq_sub.setsockopt_string(zmq.SUBSCRIBE, "")
+            self.zmq_sub.bind(f'tcp://*:{ZMQ_SERVER_SUB_PORT}')
+
+            self.shell_gui = CursesUI(self, curses_screen) if curses_screen is not None else None
+            time.sleep(0.05)  # give some time to let log display catch all startup messages
+
+            self.output_dir = Path(output_dir)
+            self.serial_dump = SerialDump(self.output_dir)
+            self.web_server = WebInterface(http_port, ws_port, self, channel_labels=channel_labels)
+        except BaseException:
+            # Release the serial port and the ZMQ context, which are already open.
+            self.shutdown()
+            raise
 
         # __enter__() returns the PacketReceiver protocol, not the thread, so keep a
         # reference to the thread as well; shutdown() needs it to stop reading.
@@ -220,17 +141,14 @@ class TeensyCommander:
 
         self.zmq_subscriber = threading.Thread(target=self.subscriber, daemon=True)
 
-    def run_forever(self):
-        """Run the session, returning once the user closes the control window.
+    def start(self):
+        """Start relaying commands from ZMQ to the Teensy. Returns immediately.
 
-        Tk's event loop *is* the main loop: every worker (serial reader, HTTP and
-        WebSocket servers, ZMQ subscriber) is a daemon thread, so the main thread
-        only has to keep Tk responsive. It used to `time.sleep(1)` in a loop here
-        instead, which left the macOS event queue unattended and made the OS
-        report the process as "application not responding".
+        Every worker (serial reader, HTTP and WebSocket servers, ZMQ subscriber) is a
+        daemon thread; the main thread belongs to the control window's Qt event loop,
+        which is what keeps the process responsive (see run_gui).
         """
         self.zmq_subscriber.start()
-        menu(self)
 
     def handle_packet(self, packet):
         self.n_packet += 1
@@ -279,7 +197,6 @@ class TeensyCommander:
         logging.debug('Reset')
         try:
             reset = pack_reset_packet()
-            SerialDump()
             if reset is None:
                 logging.error('Failed to pack!')
                 return
@@ -323,38 +240,67 @@ class TeensyCommander:
             self.serial.close()
 
 
-def main(screen, cli_args, channel_labels=None):
-    # SerialDump() opens a tkinter directory chooser, so a root must already exist.
-    get_root()
-    logging.info(
-        "Known serial ports: " + repr(sorted([comport.device for comport in serial.tools.list_ports.comports()])))
-    logging.info(
-        f"Launching Teensy Commander on serial port {cli_args.serial_port} and the web interface "
-        f"on ports HTTP:{cli_args.http_port} and WS:{cli_args.ws_port}")
-    tc = TeensyCommander(serial_port=cli_args.serial_port,
-                         http_port=cli_args.http_port,
-                         ws_port=cli_args.ws_port,
-                         curses_screen=screen,
-                         write_bin=cli_args.binfile,
-                         use_dummy=cli_args.dummy,
-                         channel_labels=channel_labels)
+def run_gui(screen, cli_args, channel_labels=None):
+    """Show the control window and run the session from it. Returns once it is closed.
+
+    ``screen`` is the curses screen with -C and None otherwise; the commander that Play
+    creates attaches its text-mode status interface to it.
+    """
+    # Imported here rather than at the top: control_window imports this module for
+    # TeensyCommander, so importing it back at module level would be circular.
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication
+
+    from .control_window import ControlWindow
+
+    app = QApplication.instance() or QApplication(sys.argv[:1])
+    app.setApplicationName('TotalSync')
+    window = ControlWindow(cli_args, channel_labels, curses_screen=screen)
+
+    # Ctrl-C in the terminal. Qt's event loop runs in C++, where Python never gets to
+    # look at a pending signal, so a KeyboardInterrupt would only be raised - if at all -
+    # once some unrelated Python callback happened to run. Handle SIGINT explicitly
+    # instead, and give the interpreter a regular slot in which to notice it.
+    signal.signal(signal.SIGINT, lambda *_: window.force_quit())
+    wakeup = QTimer()
+    wakeup.timeout.connect(lambda: None)
+    wakeup.start(200)
+
+    window.show()
+    window.raise_()
+    # Given the port and the directory on the command line there is nothing left to ask,
+    # so start straight away, as the old startup dialog was skipped. Queued rather than
+    # called directly, so that a warning from play() has a window on screen to sit on.
+    if cli_args.serial_port is not None and cli_args.output_dir is not None:
+        QTimer.singleShot(0, window.play)
+
     try:
-        tc.run_forever()
-    except KeyboardInterrupt:
-        logging.info('Interrupted, shutting down.')
+        app.exec()
     finally:
-        # Both must happen on the way out: a live ZMQ context or Tk root keeps the
-        # process up long enough for macOS to call it unresponsive.
-        tc.shutdown()
-        destroy_root()
+        wakeup.stop()
+        signal.signal(signal.SIGINT, signal.default_int_handler)
+        if window.commander is not None:
+            # A live ZMQ context keeps the process up long enough for macOS to call it
+            # unresponsive, so release it on every way out.
+            window.commander.shutdown()
 
 
 def cli_entry():
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--serial_port', default=None,
-                        help='Serial port of the Teensy. If omitted, a startup dialog asks for one.')
-    parser.add_argument('-w', '--ws_port', default=WS_PORT)
-    parser.add_argument('-H', '--http_port', default=HTTP_PORT)
+                        help='Serial port of the Teensy, filled into the control window. Together '
+                             'with -o the session starts without waiting for Play.')
+    parser.add_argument('-o', '--output-dir', default=None, metavar='DIR',
+                        help='Directory to write the recording into, filled into the control '
+                             'window (default: the working directory).')
+    parser.add_argument('--no-browser', action='store_true',
+                        help='Do not open the web interface in a browser at startup')
+    parser.add_argument('-w', '--ws_port', type=int, default=WS_PORT,
+                        help=f'Websocket port (default {WS_PORT}). Note that the browser '
+                             f'client hardcodes {WS_PORT}, so changing this stops the '
+                             f'page from receiving data.')
+    parser.add_argument('-H', '--http_port', type=int, default=HTTP_PORT,
+                        help=f'Port the web interface is served on (default {HTTP_PORT})')
     parser.add_argument('-B', '--binfile', action='store_true', help='Write decoded binary serial dump file')
     parser.add_argument('-C', '--curses', action='store_true', help='Use cursesUI in terminal')
     parser.add_argument('-D', '--dummy', action='store_true',
@@ -399,91 +345,10 @@ def cli_entry():
     # after the serial port and the servers are already up.
     channel_labels = load_pin_labels(cli_args.pinsheet) if cli_args.pinsheet else {}
 
-    # Only ask interactively when no port was given on the command line, so that
-    # --help and scripted runs never open a window.
-    if cli_args.serial_port is None:
-        port = welcome_dialog()
-        if port is QUIT:
-            logging.info('Quit requested in the startup dialog.')
-            destroy_root()
-            return
-        cli_args.serial_port = port or DEFAULT_SERIAL_PORT
-
     if cli_args.curses and curses is not None:
-        curses.wrapper(main, cli_args, channel_labels)
+        curses.wrapper(run_gui, cli_args, channel_labels)
     else:
-        main(None, cli_args, channel_labels)
-
-
-def menu(commander):
-    """Run the control window for a running commander. Returns when it is closed.
-
-    This window stays up for the whole session, so its event loop is what keeps
-    the process responsive; see TeensyCommander.run_forever.
-    """
-    win = tk.Toplevel(get_root())
-    win.title('Totalsync')
-
-    def quit_app():
-        # Never sys.exit() here, see the comment on QUIT: clearing `alive` and
-        # closing the window is what actually ends the session.
-        commander.alive = False
-        win.destroy()
-
-    def on_quit():
-        if mb.askyesno('Verify', 'Really quit?', parent=win):
-            quit_app()
-            return
-        mb.showinfo('No', 'Quit has been cancelled', parent=win)
-
-    def on_reset():
-        commander.reset_packet()
-        open_web_interface()
-
-    def on_reload():
-        open_web_interface()
-
-    def on_close():
-        if mb.askokcancel('Quit', 'Do you want to quit?', parent=win):
-            quit_app()
-
-    # Raw packet count at the previous tick, so the delta can be reported.
-    last_count = [0]
-
-    def report_packet_count():
-        """Log the received-packet counters, once per watchdog tick."""
-        received = commander.serial_dump.n_raw_packets
-        new = received - last_count[0]
-        last_count[0] = received
-        msg = (f'Serial packets: {received} received (+{new}), '
-               f'{commander.n_packet} decoded, {commander.packets_per_second:.1f}/s')
-        if new:
-            logging.info(msg)
-        else:
-            # A silent port is the failure this counter exists to make visible, so
-            # say so at a level that survives the default verbosity.
-            logging.warning(msg + ' - nothing received since the last check!')
-
-    def watchdog():
-        """Periodic health check, rescheduled on the Tk event loop."""
-        if not commander.alive:
-            quit_app()
-            return
-        report_packet_count()
-        if commander.shell_gui and commander.shell_gui.alive and not commander.shell_gui.is_alive():
-            logging.critical("Shell GUI died!")
-            # TODO: attempt to restart the shell GUI
-        win.after(1000, watchdog)
-
-    win.protocol('WM_DELETE_WINDOW', on_close)
-    tk.Label(win, text='TotalSync is now in use').pack()
-    tk.Button(win, text='Quit', command=on_quit).pack()
-    tk.Button(win, text='Reset', command=on_reset).pack()
-    tk.Button(win, text='Reload', command=on_reload).pack()
-
-    win.after(1000, watchdog)
-    win.wait_window()
-    commander.alive = False
+        run_gui(None, cli_args, channel_labels)
 
 
 if __name__ == "__main__":
