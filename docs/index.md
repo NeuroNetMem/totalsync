@@ -37,6 +37,7 @@ The wiring of the Teensy is described in a human-readable JSON file,the pinSheet
 ## The six commands
 
 TotalSync provides multiple options, which can be accessed using the following commands:
+
 ::::{grid} 1 1 2 2
 :gutter: 3
 
