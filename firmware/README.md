@@ -12,12 +12,13 @@ pio run -e template_experiment              # build
 pio run -e template_experiment -t upload    # build and flash the Teensy
 ```
 
-Four environments ship as examples, one per experiment:
+Five environments ship as examples, one per experiment:
 
 | Environment | What it is |
 | --- | --- |
 | `template_experiment` | A documented starting point: a rodent-VR pinout with no task logic |
 | `slm_aatc` | Spatial-light-modulator stimulation with an AATC trigger |
+| `cs_plus_only` | Variant of `slm_aatc` with only the CS+ (tone 0) and 6 SLM triggers per stimulation |
 | `ofl_shock` | Observational fear learning, with shock and pre-shock phases |
 | `widefield_generic` | Widefield imaging: two Basler cameras and alternating light sources |
 
